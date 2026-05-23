@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MdLocationOn, MdBarChart, MdMenu, MdSearch, MdNotifications, MdPerson, MdTrendingUp, MdLogout, MdSettings } from 'react-icons/md';
+import { MdLocationOn, MdBarChart, MdMenu, MdClose, MdSearch, MdNotifications, MdPerson, MdTrendingUp, MdLogout, MdSettings } from 'react-icons/md';
 import { Badge } from '../Badge';
 import { CategoryType, categoryConfig } from '../CategoryChip';
 import { ExportButton } from '../ExportButton';
@@ -29,6 +29,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
   const [search, setSearch] = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isLoadingTable, setIsLoadingTable] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const filteredReports = mockReports.filter(report => {
@@ -71,9 +72,28 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
   }, [selectedStatus, selectedCategory, search, currentView]);
 
   return (
-    <div className="h-full flex bg-gray-50">
-      <aside className="w-56 bg-white border-r border-border flex flex-col">
-        <div className="px-4 py-4 border-b border-border">
+    <div className="h-full flex bg-gray-50 overflow-hidden">
+      {/* Overlay mobile */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            key="overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <aside className={`
+        fixed inset-y-0 left-0 z-40 w-56 bg-white border-r border-border flex flex-col
+        transition-transform duration-300
+        md:relative md:translate-x-0 md:z-auto
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="px-4 py-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-gradient-to-br from-primary to-blue-600 rounded-xl p-2 shadow-md shadow-primary/30">
               <MdLocationOn className="w-5 h-5 text-white" />
@@ -83,6 +103,9 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
               <p className="text-[11px] text-muted-foreground">Municipal</p>
             </div>
           </div>
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+            <MdClose className="w-4 h-4 text-gray-500" />
+          </button>
         </div>
 
         <nav className="p-3 space-y-1">
@@ -93,7 +116,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
           ].map((item) => (
             <button
               key={item.label}
-              onClick={() => setCurrentView(item.view)}
+              onClick={() => { setCurrentView(item.view); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all font-semibold ${
                 currentView === item.view
                   ? 'bg-gradient-to-r from-primary to-blue-600 text-white shadow-md shadow-primary/30'
@@ -167,16 +190,24 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {currentView !== 'reports' && (
           <header className="bg-gradient-to-r from-primary to-blue-600 text-white">
-            <div className="px-4 py-3 flex items-center justify-between">
-              <div>
-                <h2 className="font-bold">
-                  {currentView === 'map' ? 'Mapa de Ocorrências' : 'Fila de Chamados'}
-                </h2>
-                <p className="text-white/80 text-xs">
-                  {currentView === 'map' ? 'Visualização geográfica das denúncias' : `${filteredReports.length} chamado(s) listado(s)`}
-                </p>
+            <div className="px-4 py-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="md:hidden p-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-colors flex-shrink-0"
+                >
+                  <MdMenu className="w-5 h-5" />
+                </button>
+                <div className="min-w-0">
+                  <h2 className="font-bold truncate">
+                    {currentView === 'map' ? 'Mapa de Ocorrências' : 'Fila de Chamados'}
+                  </h2>
+                  <p className="text-white/80 text-xs truncate">
+                    {currentView === 'map' ? 'Visualização geográfica' : `${filteredReports.length} chamado(s)`}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <button className="p-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-colors relative">
                   <MdNotifications className="w-5 h-5" />
                   <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
@@ -193,7 +224,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
           <ReportsScreen />
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {statCards.map((stat, i) => (
                 <motion.div
                   key={stat.label}
@@ -244,7 +275,8 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
               <SkeletonTable rows={8} />
             ) : (
               <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px]">
                   <thead className="bg-gray-50 border-b border-border">
                     <tr>
                       {['ID', 'Categoria', 'Endereço', 'Bairro', 'Data', 'Status', 'Ação'].map(h => (
@@ -287,6 +319,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
                 {filteredReports.length === 0 && (
                   <div className="py-8 text-center text-sm text-muted-foreground">Nenhum chamado encontrado</div>
                 )}
+                </div>
               </div>
             )}
           </div>
@@ -294,7 +327,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
       </div>
 
       {currentView === 'calls' && (
-        <aside className="w-72 bg-white border-l border-border p-4 space-y-3 overflow-y-auto">
+        <aside className="hidden xl:block w-72 bg-white border-l border-border p-4 space-y-3 overflow-y-auto">
           <div>
             <h3 className="font-bold text-sm mb-2 text-gray-900">Mapa de Calor</h3>
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl h-44 flex items-center justify-center border border-blue-100 relative overflow-hidden">
