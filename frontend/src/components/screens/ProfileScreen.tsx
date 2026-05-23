@@ -1,4 +1,8 @@
-import { MdArrowBack, MdPerson, MdEmail, MdNotifications, MdLanguage, MdHelpOutline, MdLogout, MdChevronRight, MdEdit, MdPhone, MdLocationOn, MdBarChart } from 'react-icons/md';
+import { useUser, useClerk } from '@clerk/clerk-react';
+import { CLERK_ENABLED } from '../../lib/auth';
+
+type ClerkUser = NonNullable<ReturnType<typeof useUser>['user']>;
+import { MdArrowBack, MdPerson, MdEmail, MdNotifications, MdLanguage, MdHelpOutline, MdLogout, MdChevronRight, MdPhone, MdLocationOn, MdBarChart } from 'react-icons/md';
 import { motion } from 'motion/react';
 
 interface ProfileScreenProps {
@@ -8,18 +12,64 @@ interface ProfileScreenProps {
   onLogout?: () => void;
 }
 
-export function ProfileScreen({ onBack, onSettingClick, onStatsClick, onLogout }: ProfileScreenProps) {
+function ProfileWithClerk({ onBack, onSettingClick, onStatsClick, onLogout }: ProfileScreenProps) {
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+  return <ProfileContent onBack={onBack} onSettingClick={onSettingClick} onStatsClick={onStatsClick} onLogout={onLogout} user={user ?? null} isLoaded={isLoaded} signOut={signOut} />;
+}
+
+function ProfileWithoutClerk({ onBack, onSettingClick, onStatsClick, onLogout }: ProfileScreenProps) {
+  return <ProfileContent onBack={onBack} onSettingClick={onSettingClick} onStatsClick={onStatsClick} onLogout={onLogout} user={null} isLoaded={true} signOut={async () => {}} />;
+}
+
+export function ProfileScreen(props: ProfileScreenProps) {
+  return CLERK_ENABLED ? <ProfileWithClerk {...props} /> : <ProfileWithoutClerk {...props} />;
+}
+
+interface ProfileContentProps extends ProfileScreenProps {
+  user: ClerkUser | null;
+  isLoaded: boolean;
+  signOut: () => Promise<void>;
+}
+
+function ProfileContent({ onBack, onSettingClick, onStatsClick, onLogout, user, isLoaded, signOut }: ProfileContentProps) {
+  const handleLogout = async () => {
+    await signOut();
+    onLogout?.();
+  };
+
+  const displayName = user?.fullName || user?.firstName || 'Usuário';
+  const email = user?.emailAddresses[0]?.emailAddress ?? '';
+  const phone = user?.phoneNumbers[0]?.phoneNumber ?? null;
+  const memberSince = user?.createdAt
+    ? new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(user.createdAt))
+    : null;
+
   const menuItems = [
     { icon: MdNotifications, label: 'Notificações', description: 'Gerenciar alertas e avisos', color: 'from-blue-500 to-blue-600', type: 'notifications' as const },
     { icon: MdLanguage, label: 'Idioma', description: 'Português (Brasil)', color: 'from-green-500 to-green-600', type: 'language' as const },
-    { icon: MdHelpOutline, label: 'Ajuda e Suporte', description: 'Central de ajuda', color: 'from-purple-500 to-purple-600', type: 'help' as const }
+    { icon: MdHelpOutline, label: 'Ajuda e Suporte', description: 'Central de ajuda', color: 'from-purple-500 to-purple-600', type: 'help' as const },
   ];
 
   const stats = [
     { value: '12', label: 'Denúncias', gradient: 'from-blue-500 to-blue-600' },
     { value: '8', label: 'Em andamento', gradient: 'from-amber-500 to-amber-600' },
-    { value: '4', label: 'Resolvidas', gradient: 'from-green-500 to-green-600' }
+    { value: '4', label: 'Resolvidas', gradient: 'from-green-500 to-green-600' },
   ];
+
+  const contactItems = [
+    ...(email ? [{ icon: MdEmail, color: 'from-blue-500 to-blue-600', label: 'E-mail', value: email }] : []),
+    ...(phone ? [{ icon: MdPhone, color: 'from-green-500 to-green-600', label: 'Telefone', value: phone }] : []),
+    { icon: MdLocationOn, color: 'from-purple-500 to-purple-600', label: 'Cidade', value: 'São Paulo, SP' },
+  ];
+
+  if (!isLoaded) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-background overflow-y-auto">
@@ -38,24 +88,33 @@ export function ProfileScreen({ onBack, onSettingClick, onStatsClick, onLogout }
       </div>
 
       <div className="flex-1 p-4 max-w-5xl mx-auto w-full space-y-3">
+        {/* Card do usuário */}
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/30">
-                <MdPerson className="w-8 h-8 text-white" />
-              </div>
-              <button className="absolute -bottom-1 -right-1 p-1.5 bg-green-500 text-white rounded-lg shadow-md hover:bg-green-600 transition-colors">
-                <MdEdit className="w-3 h-3" />
-              </button>
+              {user?.imageUrl ? (
+                <img
+                  src={user.imageUrl}
+                  alt={displayName}
+                  className="w-16 h-16 rounded-2xl object-cover shadow-md"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/30">
+                  <MdPerson className="w-8 h-8 text-white" />
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="font-bold text-gray-900">João Silva</h2>
+              <h2 className="font-bold text-gray-900 truncate">{displayName}</h2>
               <p className="text-xs text-gray-500">Cidadão Participativo</p>
-              <p className="text-xs text-gray-400 mt-0.5 truncate">Membro desde maio/2025</p>
+              {memberSince && (
+                <p className="text-xs text-gray-400 mt-0.5">Membro desde {memberSince}</p>
+              )}
             </div>
           </div>
         </motion.div>
 
+        {/* Stats */}
         <div className="grid grid-cols-3 gap-2">
           {stats.map((stat, i) => (
             <motion.div
@@ -72,6 +131,7 @@ export function ProfileScreen({ onBack, onSettingClick, onStatsClick, onLogout }
           ))}
         </div>
 
+        {/* Botão estatísticas */}
         <motion.button
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -92,6 +152,7 @@ export function ProfileScreen({ onBack, onSettingClick, onStatsClick, onLogout }
         </motion.button>
 
         <div className="grid gap-3 md:grid-cols-2">
+          {/* Informações de contato */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -99,11 +160,7 @@ export function ProfileScreen({ onBack, onSettingClick, onStatsClick, onLogout }
             className="bg-white rounded-xl shadow-sm p-4 space-y-3"
           >
             <h3 className="font-bold text-gray-900">Informações de Contato</h3>
-            {[
-              { icon: MdEmail, color: 'from-blue-500 to-blue-600', label: 'E-mail', value: 'joao.silva@email.com' },
-              { icon: MdPhone, color: 'from-green-500 to-green-600', label: 'Telefone', value: '(11) 98765-4321' },
-              { icon: MdLocationOn, color: 'from-purple-500 to-purple-600', label: 'Cidade', value: 'São Paulo, SP' }
-            ].map((item, i) => (
+            {contactItems.map((item, i) => (
               <div key={i} className="flex items-start gap-3">
                 <div className={`p-2 bg-gradient-to-br ${item.color} rounded-lg`}>
                   <item.icon className="w-4 h-4 text-white" />
@@ -116,6 +173,7 @@ export function ProfileScreen({ onBack, onSettingClick, onStatsClick, onLogout }
             ))}
           </motion.div>
 
+          {/* Configurações */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -146,8 +204,9 @@ export function ProfileScreen({ onBack, onSettingClick, onStatsClick, onLogout }
           </motion.div>
         </div>
 
+        {/* Botão sair */}
         <button
-          onClick={onLogout}
+          onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl shadow-md hover:shadow-lg transition-all"
         >
           <MdLogout className="w-5 h-5" />
