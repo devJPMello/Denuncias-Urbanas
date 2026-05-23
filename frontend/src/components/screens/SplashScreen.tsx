@@ -110,25 +110,6 @@ export function SplashScreen({ onLogin, onAdmin }: SplashScreenProps) {
             </Button>
           </motion.div>
 
-          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button
-              size="lg"
-              className="w-full bg-white/10 border border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
-              onClick={onLogin}
-            >
-              Criar conta gratuita
-            </Button>
-          </motion.div>
-
-          <div className="relative py-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/20" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="px-4 bg-transparent text-white/50 text-xs">ou</span>
-            </div>
-          </div>
-
           <motion.button
             whileHover={{ x: 4 }}
             onClick={onAdmin}

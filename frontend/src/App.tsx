@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAppAuth } from './lib/auth';
 import { SplashScreen } from './components/screens/SplashScreen';
 import { LoginScreen } from './components/screens/LoginScreen';
 import { MapScreen } from './components/screens/MapScreen';
@@ -15,6 +16,14 @@ type SettingType = 'notifications' | 'language' | 'help';
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
   const [settingType, setSettingType] = useState<SettingType>('notifications');
+  const { isSignedIn, isLoaded } = useAppAuth();
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (isSignedIn && (currentScreen === 'splash' || currentScreen === 'login')) {
+      setCurrentScreen('map');
+    }
+  }, [isLoaded, isSignedIn]);
 
   const renderScreen = () => {
     switch (currentScreen) {
