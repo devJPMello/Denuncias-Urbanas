@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { MdLocationOn, MdFilterList, MdSearch, MdZoomIn, MdZoomOut, MdMyLocation } from 'react-icons/md';
+import { MdLocationOn, MdFilterList, MdSearch, MdZoomIn, MdZoomOut, MdMyLocation, MdClose } from 'react-icons/md';
 import { CategoryType, categoryConfig } from '../CategoryChip';
 import { Badge } from '../Badge';
 import { ExportButton } from '../ExportButton';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const mockReports = [
   { id: '1', category: 'buraco' as CategoryType, address: 'Av. Paulista, 1578 - Bela Vista', status: 'analysis' as const, date: '18/05/2026' },
@@ -18,6 +18,7 @@ export function MapAdminScreen() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'open' | 'analysis' | 'resolved'>('all');
   const [search, setSearch] = useState('');
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const filteredReports = mockReports.filter(report => {
     const categoryMatch = selectedCategory === 'all' || report.category === selectedCategory;
@@ -58,15 +59,35 @@ export function MapAdminScreen() {
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-80 border-r border-border bg-white overflow-y-auto">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Overlay mobile */}
+        <AnimatePresence>
+          {panelOpen && (
+            <motion.div
+              key="panel-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-30 md:hidden"
+              onClick={() => setPanelOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Painel de ocorrências */}
+        <div className={`
+          fixed inset-y-0 left-0 z-40 w-80 bg-white border-r border-border flex flex-col overflow-hidden
+          transition-transform duration-300
+          md:relative md:translate-x-0 md:z-auto md:flex
+          ${panelOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
           <div className="p-3 border-b border-border flex items-center justify-between">
             <h3 className="font-bold text-sm text-gray-900">{filteredReports.length} Ocorrências</h3>
-            <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-              <MdFilterList className="w-4 h-4 text-gray-600" />
+            <button onClick={() => setPanelOpen(false)} className="md:hidden p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+              <MdClose className="w-4 h-4 text-gray-600" />
             </button>
           </div>
-          <div className="p-3 space-y-2">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {filteredReports.map((report, i) => {
               const Icon = categoryConfig[report.category].icon;
               const config = categoryConfig[report.category];
@@ -137,6 +158,15 @@ export function MapAdminScreen() {
               <button className="p-3 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all border border-gray-200"><MdZoomOut className="w-5 h-5 text-gray-700" /></button>
               <button className="p-3 bg-gradient-to-br from-primary to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all"><MdMyLocation className="w-5 h-5" /></button>
             </div>
+
+            {/* Botão lista — visível só no mobile */}
+            <button
+              onClick={() => setPanelOpen(true)}
+              className="md:hidden absolute bottom-4 left-4 flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl shadow-lg border border-gray-200 text-sm font-semibold text-gray-700"
+            >
+              <MdFilterList className="w-4 h-4" />
+              Lista ({filteredReports.length})
+            </button>
 
             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg border border-gray-200">
               <div className="flex items-center gap-2">
