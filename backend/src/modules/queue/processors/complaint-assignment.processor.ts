@@ -1,8 +1,8 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { InjectQueue } from '@nestjs/bullmq';
+import { Processor, WorkerHost, InjectQueue } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import {
   QUEUE_COMPLAINT_ASSIGNMENT,
   QUEUE_PUSH_NOTIFICATION,
@@ -17,7 +17,8 @@ export class ComplaintAssignmentProcessor extends WorkerHost {
   private readonly logger = new Logger(ComplaintAssignmentProcessor.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma:         PrismaService,
+    private readonly notifications:  NotificationsService,
     @InjectQueue(QUEUE_PUSH_NOTIFICATION) private readonly pushQueue: Queue,
   ) {
     super();
@@ -30,7 +31,7 @@ export class ComplaintAssignmentProcessor extends WorkerHost {
     this.logger.log(`Processando atribuição da denúncia #${denunciaId}`);
 
     const denuncia = await this.prisma.denuncia.findUnique({
-      where: { id: denunciaId },
+      where:   { id: denunciaId },
       include: { autor: true },
     });
 
@@ -39,15 +40,22 @@ export class ComplaintAssignmentProcessor extends WorkerHost {
       return;
     }
 
-    // Avança status para "em análise"
-    await this.prisma.denuncia.update({
+    const updated = await this.prisma.denuncia.update({
       where: { id: denunciaId },
       data:  { status: 'analise' },
     });
 
     this.logger.log(`Denúncia #${denunciaId} movida para analise`);
 
-    // Notifica o autor
+    // WebSocket — atualiza a UI em tempo real
+    this.notifications.emitComplaintUpdate(
+      denuncia.autorId,
+      denunciaId,
+      updated.status,
+      updated.atualizadoEm,
+    );
+
+    // Push notification — notifica mesmo com app fechado
     const pushPayload: SendPushJob = {
       usuarioId: denuncia.autorId,
       titulo:    '📋 Denúncia em análise',
@@ -56,8 +64,8 @@ export class ComplaintAssignmentProcessor extends WorkerHost {
     };
 
     await this.pushQueue.add(JOB_SEND_PUSH, pushPayload, {
-      attempts:      3,
-      backoff:       { type: 'exponential', delay: 5_000 },
+      attempts:         3,
+      backoff:          { type: 'exponential', delay: 5_000 },
       removeOnComplete: true,
     });
   }
