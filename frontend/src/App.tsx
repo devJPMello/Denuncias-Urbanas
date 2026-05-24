@@ -9,7 +9,9 @@ import { AdminPanelScreen } from './components/screens/AdminPanelScreen';
 import { ProfileScreen } from './components/screens/ProfileScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { UserStatsScreen } from './components/screens/UserStatsScreen';
-import { UpdatePrompt } from './components/UpdatePrompt';
+import { UpdatePrompt }      from './components/UpdatePrompt';
+import { ConnectionStatus }  from './components/ConnectionStatus';
+import { InstallPWAPrompt }  from './components/InstallPWAPrompt';
 
 type Screen = 'splash' | 'login' | 'map' | 'my-reports' | 'report-detail' | 'admin' | 'profile' | 'settings' | 'user-stats';
 type SettingType = 'notifications' | 'language' | 'help';
@@ -88,6 +90,8 @@ export default function App() {
     <div className="w-screen h-screen bg-background overflow-hidden">
       {renderScreen()}
       <UpdatePrompt />
+      <ConnectionStatus />
+      <InstallPWAPrompt />
     </div>
   );
 }
