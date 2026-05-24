@@ -1,12 +1,17 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { ClerkAuthGuard } from './guards/clerk-auth.guard';
+import { CurrentUser } from './decorators/current-user.decorator';
+import { Usuario } from '@prisma/client';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('login')
-  login(@Body() body: { email: string; senha: string }) {
-    return this.authService.login(body.email, body.senha);
+  /** Retorna os dados do usuário autenticado (útil para debug / profile). */
+  @Get('me')
+  @UseGuards(ClerkAuthGuard)
+  me(@CurrentUser() user: Usuario) {
+    return this.authService.me(user);
   }
 }

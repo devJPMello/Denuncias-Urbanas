@@ -14,21 +14,22 @@ export class DenunciasController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.denunciasService.findOne(+id);
+    return this.denunciasService.findOne(id);
   }
 
   @Post()
-  create(@Body() createDenunciaDto: CreateDenunciaDto) {
-    return this.denunciasService.create(createDenunciaDto);
+  create(@Body() dto: CreateDenunciaDto) {
+    // autorId virá do JWT guard em epic futuro; placeholder por enquanto
+    return this.denunciasService.create({ ...dto, autorId: dto.autorId ?? '' });
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() updateDenunciaDto: UpdateDenunciaDto) {
-    return this.denunciasService.update(+id, updateDenunciaDto);
+  update(@Param('id') id: string, @Body() dto: UpdateDenunciaDto) {
+    return this.denunciasService.update(id, dto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.denunciasService.remove(+id);
+    return this.denunciasService.remove(id);
   }
 }

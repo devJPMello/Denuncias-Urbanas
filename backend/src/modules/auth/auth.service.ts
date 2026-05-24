@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { Usuario } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
-  async login(email: string, senha: string) {
-    // TODO: validar credenciais e retornar JWT
-    return { access_token: '' };
+  me(user: Usuario) {
+    const { ...safe } = user;
+    return safe;
   }
 }
