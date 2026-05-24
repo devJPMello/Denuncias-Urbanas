@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum Role {
+  cidadao
+  admin
+}
+
+enum StatusDenuncia {
+  aberto
+  analise
+  resolvido
+  cancelado
+}
+
+enum CategoriaDenuncia {
+  buraco
+  iluminacao
+  lixo
+  calcada
+  vandalismo
+  outros
+}
+
+// ── Models ────────────────────────────────────────────────────────────────────
+
+model Usuario {
+  id           String     @id @default(cuid())
+  clerkId      String     @unique @map("clerk_id")
+  nome         String
+  email        String     @unique
+  role         Role       @default(cidadao)
+  criadoEm    DateTime   @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt      @map("atualizado_em")
+
+  denuncias    Denuncia[]
+
+  @@map("usuarios")
+}
+
+model Denuncia {
+  id           String            @id @default(cuid())
+  titulo       String
+  descricao    String
+  categoria    CategoriaDenuncia
+  endereco     String
+  imagemUrl    String?           @map("imagem_url")
+  status       StatusDenuncia    @default(aberto)
+  lat          Float?
+  lng          Float?
+  autorId      String            @map("autor_id")
+  autor        Usuario           @relation(fields: [autorId], references: [id])
+  criadoEm    DateTime          @default(now()) @map("criado_em")
+  atualizadoEm DateTime         @updatedAt      @map("atualizado_em")
+
+  @@map("denuncias")
+}

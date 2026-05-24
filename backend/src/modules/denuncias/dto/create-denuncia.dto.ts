@@ -1,11 +1,12 @@
-import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum, IsOptional, IsNumber } from 'class-validator';
 
 export enum CategoriaDenuncia {
-  BURACO = 'buraco',
+  BURACO     = 'buraco',
   ILUMINACAO = 'iluminacao',
-  LIXO = 'lixo',
+  LIXO       = 'lixo',
+  CALCADA    = 'calcada',
   VANDALISMO = 'vandalismo',
-  OUTROS = 'outros',
+  OUTROS     = 'outros',
 }
 
 export class CreateDenunciaDto {
@@ -27,4 +28,15 @@ export class CreateDenunciaDto {
   @IsString()
   @IsOptional()
   imagemUrl?: string;
+
+  @IsNumber()
+  @IsOptional()
+  lat?: number;
+
+  @IsNumber()
+  @IsOptional()
+  lng?: number;
+
+  /** Preenchido pelo guard JWT — não expor no body */
+  autorId?: string;
 }
