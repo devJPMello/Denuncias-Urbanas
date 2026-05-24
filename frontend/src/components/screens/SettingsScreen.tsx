@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { MdArrowBack, MdNotifications, MdLanguage, MdExpandMore } from 'react-icons/md';
+import { MdArrowBack, MdNotifications, MdLanguage, MdExpandMore, MdWarning } from 'react-icons/md';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNotifications } from '../../hooks/useNotifications';
 
 // ── FAQ data ──────────────────────────────────────────────────────────────────
 
@@ -116,23 +117,69 @@ interface SettingsScreenProps {
 }
 
 export function SettingsScreen({ onBack, settingType = 'notifications' }: SettingsScreenProps) {
-  const [enablePush, setEnablePush] = useState(true);
+  const { permission, isSubscribed, isLoading, enablePush, disablePush } = useNotifications();
   const [enableEmail, setEnableEmail] = useState(true);
   const [enableSound, setEnableSound] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('pt-BR');
+
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked) await enablePush();
+    else await disablePush();
+  };
 
   const renderContent = () => {
     switch (settingType) {
       case 'notifications':
         return (
           <div className="space-y-4">
+            {/* Banner: permission denied */}
+            {permission === 'denied' && (
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <MdWarning className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">Notificações bloqueadas</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Permissão negada pelo navegador. Acesse as configurações do seu navegador para reativar.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Banner: unsupported */}
+            {permission === 'unsupported' && (
+              <div className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3">
+                <MdWarning className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-gray-500">
+                  Seu navegador não suporta notificações push.
+                </p>
+              </div>
+            )}
+
             <div className="bg-white rounded-xl shadow-sm p-4">
               <h3 className="font-bold text-gray-900 mb-4">Notificações Push</h3>
               <div className="space-y-3">
+                {/* Push — wired to useNotifications */}
+                <div className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg transition-opacity ${isLoading ? 'opacity-60' : ''}`}>
+                  <div>
+                    <p className="font-semibold text-sm text-gray-900">Atualizações de Status</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Receba quando suas denúncias forem atualizadas</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isSubscribed}
+                      disabled={isLoading || permission === 'denied' || permission === 'unsupported'}
+                      onChange={(e) => handlePushToggle(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary disabled:cursor-not-allowed" />
+                  </label>
+                </div>
+
+                {/* Email + Sound — local state only (sem backend ainda) */}
                 {[
-                  { label: 'Atualizações de Status', desc: 'Receba quando suas denúncias forem atualizadas', checked: enablePush, onChange: setEnablePush },
                   { label: 'Notificações por E-mail', desc: 'Resumo diário das suas denúncias', checked: enableEmail, onChange: setEnableEmail },
-                  { label: 'Sons de Notificação', desc: 'Reproduzir som ao receber notificações', checked: enableSound, onChange: setEnableSound }
+                  { label: 'Sons de Notificação',     desc: 'Reproduzir som ao receber notificações', checked: enableSound, onChange: setEnableSound },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div>
