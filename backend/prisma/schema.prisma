@@ -33,17 +33,31 @@ enum CategoriaDenuncia {
 // ── Models ────────────────────────────────────────────────────────────────────
 
 model Usuario {
-  id           String     @id @default(cuid())
-  clerkId      String     @unique @map("clerk_id")
-  nome         String
-  email        String     @unique
-  role         Role       @default(cidadao)
-  criadoEm    DateTime   @default(now()) @map("criado_em")
-  atualizadoEm DateTime  @updatedAt      @map("atualizado_em")
+  id                String             @id @default(cuid())
+  clerkId           String             @unique @map("clerk_id")
+  nome              String
+  email             String             @unique
+  role              Role               @default(cidadao)
+  criadoEm         DateTime           @default(now()) @map("criado_em")
+  atualizadoEm     DateTime           @updatedAt      @map("atualizado_em")
 
-  denuncias    Denuncia[]
+  denuncias         Denuncia[]
+  pushSubscriptions PushSubscription[]
 
   @@map("usuarios")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  usuarioId String   @map("usuario_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("push_subscriptions")
 }
 
 model Denuncia {

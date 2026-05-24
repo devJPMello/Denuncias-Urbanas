@@ -1,11 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDenunciaDto } from './dto/create-denuncia.dto';
 import { UpdateDenunciaDto } from './dto/update-denuncia.dto';
+import {
+  QUEUE_COMPLAINT_ASSIGNMENT,
+  JOB_ASSIGN_COMPLAINT,
+  AssignComplaintJob,
+} from '../queue/queue.constants';
 
 @Injectable()
 export class DenunciasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectQueue(QUEUE_COMPLAINT_ASSIGNMENT) private readonly assignmentQueue: Queue,
+  ) {}
 
   findAll() {
     return this.prisma.denuncia.findMany({
@@ -23,8 +33,8 @@ export class DenunciasService {
     return denuncia;
   }
 
-  create(dto: CreateDenunciaDto & { autorId: string }) {
-    return this.prisma.denuncia.create({
+  async create(dto: CreateDenunciaDto & { autorId: string }) {
+    const denuncia = await this.prisma.denuncia.create({
       data: {
         titulo:    dto.titulo,
         descricao: dto.descricao,
@@ -36,6 +46,19 @@ export class DenunciasService {
         autorId:   dto.autorId,
       },
     });
+
+    // Enfileira para atribuição automática (muda status + notifica o autor)
+    await this.assignmentQueue.add(
+      JOB_ASSIGN_COMPLAINT,
+      { denunciaId: denuncia.id } satisfies AssignComplaintJob,
+      {
+        attempts:         3,
+        backoff:          { type: 'exponential', delay: 3_000 },
+        removeOnComplete: true,
+      },
+    );
+
+    return denuncia;
   }
 
   async update(id: string, dto: UpdateDenunciaDto) {
