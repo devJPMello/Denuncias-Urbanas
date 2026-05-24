@@ -157,26 +157,6 @@ export function ReportsScreen() {
           </motion.div>
         </div>
 
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold mb-2">Insights e Recomendações</h3>
-              <ul className="space-y-2 text-sm text-white/90">
-                <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 bg-white rounded-full mt-1.5 flex-shrink-0" /><span>Bela Vista apresenta 45% mais denúncias que a média municipal</span></li>
-                <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 bg-white rounded-full mt-1.5 flex-shrink-0" /><span>Taxa de resolução aumentou 15% comparado ao trimestre anterior</span></li>
-                <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 bg-white rounded-full mt-1.5 flex-shrink-0" /><span>Categoria "Buraco" representa 32% do total de chamados ativos</span></li>
-              </ul>
-            </div>
-            <div className="hidden lg:block">
-              <MdBarChart className="w-24 h-24 text-white/20" />
-            </div>
-          </div>
-        </motion.div>
       </div>
     </div>
   );
