@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { MdSearch, MdAdd, MdList, MdPerson, MdFilterList, MdCamera, MdLocationOn, MdClose, MdMyLocation } from 'react-icons/md';
+import { NotificationBell } from '../NotificationBell';
 import { CategoryType, CategoryChip } from '../CategoryChip';
 import { LeafletMap, MapMarker } from '../LeafletMap';
 import { Modal } from '../Modal';
@@ -93,6 +94,7 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
                 <button onClick={onMyReports} className="p-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-colors">
                   <MdList className="w-5 h-5" />
                 </button>
+                <NotificationBell />
                 <button onClick={onProfile} className="p-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-colors">
                   <MdPerson className="w-5 h-5" />
                 </button>
