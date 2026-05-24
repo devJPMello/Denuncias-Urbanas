@@ -1,6 +1,7 @@
 import { MdArrowBack, MdLocationOn, MdCalendarToday, MdMessage, MdCheck } from 'react-icons/md';
 import { Badge } from '../Badge';
 import { categoryConfig, CategoryType } from '../CategoryChip';
+import { LeafletMap, MapMarker } from '../LeafletMap';
 import { motion } from 'motion/react';
 
 interface ReportDetailScreenProps {
@@ -13,6 +14,8 @@ const mockReport = {
   address: 'Av. Paulista, 1578 - Bela Vista, São Paulo - SP',
   date: '18/05/2026',
   status: 'analysis' as const,
+  lat: -23.5616,
+  lng: -46.6564,
   description: 'Buraco grande na pista, causando risco para veículos e pedestres. O problema se agravou após as últimas chuvas.',
   timeline: [
     { date: '18/05/2026 14:30', status: 'Denúncia recebida', active: true },
@@ -128,13 +131,31 @@ export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100"
+            className="bg-white rounded-xl shadow-sm overflow-hidden"
           >
-            <div className="flex items-center justify-center mb-2">
-              <MdLocationOn className="w-10 h-10 text-primary" />
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+              <div className="p-1.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+                <MdLocationOn className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">Localização no mapa</p>
+                <p className="text-xs text-gray-500">{mockReport.address}</p>
+              </div>
             </div>
-            <p className="text-center text-sm font-semibold text-gray-700">Localização no mapa</p>
-            <p className="text-center text-xs text-gray-500">Clique para ver no mapa</p>
+            <div className="relative h-48">
+              <LeafletMap
+                center={[mockReport.lat, mockReport.lng]}
+                zoom={16}
+                markers={[{
+                  id: '1',
+                  lat: mockReport.lat,
+                  lng: mockReport.lng,
+                  color: '#EF4444',
+                  popupHtml: `<div style="font-family:sans-serif;font-size:13px"><strong>${mockReport.address}</strong></div>`,
+                } as MapMarker]}
+                className="absolute inset-0"
+              />
+            </div>
           </motion.div>
 
           {mockReport.comments.length > 0 && (
