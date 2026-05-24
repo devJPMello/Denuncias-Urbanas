@@ -1,41 +1,49 @@
-import { MdArrowBack, MdLocationOn, MdCalendarToday, MdMessage, MdCheck } from 'react-icons/md';
+import { MdArrowBack, MdLocationOn, MdCalendarToday, MdMessage, MdCheck, MdWifi } from 'react-icons/md';
 import { Badge } from '../Badge';
 import { categoryConfig, CategoryType } from '../CategoryChip';
 import { LeafletMap, MapMarker } from '../LeafletMap';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useRealTimeComplaint } from '../../hooks/useRealTimeComplaint';
 
 interface ReportDetailScreenProps {
   onBack: () => void;
 }
 
 const mockReport = {
-  category: 'buraco' as CategoryType,
-  image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=800',
-  address: 'Av. Paulista, 1578 - Bela Vista, São Paulo - SP',
-  date: '18/05/2026',
-  status: 'analysis' as const,
-  lat: -23.5616,
-  lng: -46.6564,
+  id:          '1',
+  category:    'buraco' as CategoryType,
+  image:       'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=800',
+  address:     'Av. Paulista, 1578 - Bela Vista, São Paulo - SP',
+  date:        '18/05/2026',
+  status:      'analysis' as const,
+  lat:         -23.5616,
+  lng:         -46.6564,
   description: 'Buraco grande na pista, causando risco para veículos e pedestres. O problema se agravou após as últimas chuvas.',
   timeline: [
-    { date: '18/05/2026 14:30', status: 'Denúncia recebida', active: true },
-    { date: '19/05/2026 09:15', status: 'Em análise pela equipe', active: true },
-    { date: 'Pendente', status: 'Resolvido', active: false }
+    { date: '18/05/2026 14:30', status: 'Denúncia recebida',      active: true  },
+    { date: '19/05/2026 09:15', status: 'Em análise pela equipe', active: true  },
+    { date: 'Pendente',         status: 'Resolvido',               active: false },
   ],
   comments: [
     {
       author: 'Equipe Municipal',
-      date: '19/05/2026',
-      text: 'Recebemos sua denúncia e estamos avaliando a situação. Previsão de reparo: 7 dias.'
-    }
-  ]
+      date:   '19/05/2026',
+      text:   'Recebemos sua denúncia e estamos avaliando a situação. Previsão de reparo: 7 dias.',
+    },
+  ],
 };
 
 const statusLabels = { open: 'Aberto', analysis: 'Em Análise', resolved: 'Resolvido' };
 
 export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
-  const Icon = categoryConfig[mockReport.category].icon;
+  const Icon   = categoryConfig[mockReport.category].icon;
   const config = categoryConfig[mockReport.category];
+
+  // ── Tempo real ───────────────────────────────────────────────────────────────
+  const { liveStatus, liveUpdatedAt, hasLiveUpdate } =
+    useRealTimeComplaint(mockReport.id);
+
+  const currentStatus = liveStatus ?? mockReport.status;
 
   return (
     <div className="h-full flex flex-col bg-background overflow-y-auto">
@@ -55,14 +63,51 @@ export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
             <Icon className="w-4 h-4 text-white" />
             <span className="text-white text-sm font-semibold">{config.label}</span>
           </div>
-          <div>
-            <Badge status={mockReport.status}>{statusLabels[mockReport.status]}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge status={currentStatus}>{statusLabels[currentStatus]}</Badge>
+
+            {/* Indicador "ao vivo" — aparece quando há atualização em tempo real */}
+            <AnimatePresence>
+              {hasLiveUpdate && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="flex items-center gap-1 px-2 py-0.5 bg-green-500/90 backdrop-blur-sm rounded-full"
+                >
+                  <MdWifi className="w-3 h-3 text-white" />
+                  <span className="text-white text-[10px] font-semibold">ao vivo</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
 
       <div className="flex-1 -mt-4 bg-background rounded-t-2xl relative z-10">
         <div className="p-4 space-y-3 max-w-2xl mx-auto">
+
+          {/* Atualização em tempo real */}
+          <AnimatePresence>
+            {hasLiveUpdate && liveUpdatedAt && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5"
+              >
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+                <p className="text-sm text-green-800 font-medium">
+                  Status atualizado em tempo real —{' '}
+                  <span className="font-bold">{statusLabels[currentStatus]}</span>
+                  <span className="text-green-600 font-normal">
+                    {' '}às {liveUpdatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -127,6 +172,7 @@ export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
             </motion.div>
           </div>
 
+          {/* Mapa */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -147,7 +193,7 @@ export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
                 center={[mockReport.lat, mockReport.lng]}
                 zoom={16}
                 markers={[{
-                  id: '1',
+                  id: mockReport.id,
                   lat: mockReport.lat,
                   lng: mockReport.lng,
                   color: '#EF4444',
