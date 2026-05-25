@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -9,10 +8,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // Serve arquivos de upload estaticamente em /uploads/*
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads' });
-
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   // CORS restrito: aceita apenas a origem do frontend
   app.enableCors({

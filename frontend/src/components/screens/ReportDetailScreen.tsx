@@ -91,29 +91,28 @@ export function ReportDetailScreen({ reportId, onBack }: ReportDetailScreenProps
           <MdArrowBack className="w-5 h-5" />
         </button>
 
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br ${config.gradient} rounded-lg mb-2 shadow-md`}>
+        <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2 flex-wrap">
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br ${config.gradient} rounded-lg shadow-md`}>
             <Icon className="w-4 h-4 text-white" />
             <span className="text-white text-sm font-semibold">{config.label}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge status={currentStatus}>{statusLabels[currentStatus]}</Badge>
+          <Badge status={currentStatus} className="!w-auto px-3 shadow-md">
+            {statusLabels[currentStatus]}
+          </Badge>
 
-            {/* Indicador "ao vivo" */}
-            <AnimatePresence>
-              {hasLiveUpdate && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="flex items-center gap-1 px-2 py-0.5 bg-green-500/90 backdrop-blur-sm rounded-full"
-                >
-                  <MdWifi className="w-3 h-3 text-white" />
-                  <span className="text-white text-[10px] font-semibold">ao vivo</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <AnimatePresence>
+            {hasLiveUpdate && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex items-center gap-1 px-2 py-0.5 bg-green-500/90 backdrop-blur-sm rounded-full"
+              >
+                <MdWifi className="w-3 h-3 text-white" />
+                <span className="text-white text-[10px] font-semibold">ao vivo</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 

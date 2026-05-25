@@ -1,3 +1,5 @@
+import { resolveDenunciaImageUrl } from '../lib/mediaUrl';
+
 // ── Denúncias (frontend model) ────────────────────────────────────────────────
 
 export type ComplaintStatus   = 'open' | 'analysis' | 'resolved';
@@ -32,6 +34,7 @@ export interface ApiDenuncia {
   categoria:   ApiCategory;
   endereco:    string;
   imagemUrl:   string | null;
+  temImagem?:  boolean;
   status:      ApiStatus;
   lat:         number | null;
   lng:         number | null;
@@ -51,7 +54,7 @@ export interface CreateDenunciaPayload {
   descricao: string;
   categoria: ApiCategory;
   endereco:  string;
-  imagemUrl?: string;
+  imagemFile?: File;
   lat?:      number;
   lng?:      number;
 }
@@ -98,7 +101,7 @@ export function mapApiDenuncia(d: ApiDenuncia): Complaint {
     address:     d.endereco,
     date:        formatDate(d.criadoEm),
     status:      STATUS_MAP[d.status] ?? 'open',
-    image:       d.imagemUrl ?? undefined,
+    image:       resolveDenunciaImageUrl(d.id, d.temImagem, d.imagemUrl),
     lat:         d.lat ?? undefined,
     lng:         d.lng ?? undefined,
     description: d.descricao,

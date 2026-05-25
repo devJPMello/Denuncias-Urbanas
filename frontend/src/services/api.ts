@@ -3,9 +3,19 @@
  * Todos os métodos lançam erro em respostas não-2xx.
  */
 
-// Em dev, usa URL relativa → Vite proxy encaminha /api/* → http://localhost:3000/api/*
-// Em produção, defina VITE_API_URL=https://seu-backend.com/api (sem barra final)
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+// Em dev com Vite: use VITE_API_URL=/api (proxy → http://localhost:3000/api)
+// Com backend direto: VITE_API_URL=http://localhost:3000/api (precisa do sufixo /api)
+function resolveApiBaseUrl(): string {
+  const raw = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+  const trimmed = raw.replace(/\/$/, '');
+  if (trimmed.startsWith('http') && !trimmed.endsWith('/api')) {
+    return `${trimmed}/api`;
+  }
+  return trimmed || '/api';
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
+const BASE_URL = API_BASE_URL;
 
 const DEFAULT_TIMEOUT_MS = 10_000; // 10 segundos
 

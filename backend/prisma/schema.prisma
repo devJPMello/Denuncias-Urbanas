@@ -67,6 +67,8 @@ model Denuncia {
   categoria    CategoriaDenuncia
   endereco     String
   imagemUrl    String?           @map("imagem_url")
+  imagemBytes  Bytes?            @map("imagem_bytes")
+  imagemMime   String?           @map("imagem_mime")
   status       StatusDenuncia    @default(aberto)
   lat          Float?
   lng          Float?

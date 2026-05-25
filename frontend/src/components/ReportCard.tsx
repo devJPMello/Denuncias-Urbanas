@@ -30,13 +30,26 @@ export function ReportCard({ category, image, address, date, status, onClick }: 
       className="bg-white rounded-xl shadow-sm border border-border overflow-hidden cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
     >
       <div className="relative h-32">
-        <img src={image ?? PLACEHOLDER_IMAGE} alt="Denúncia" className="w-full h-full object-cover" />
+        <img
+          src={image ?? PLACEHOLDER_IMAGE}
+          alt="Denúncia"
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
+          }}
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-        <div className={`absolute top-2 left-2 p-1.5 rounded-lg bg-gradient-to-br ${config.gradient} shadow-md`}>
-          <Icon className="w-4 h-4 text-white" />
-        </div>
-        <div className="absolute bottom-2 left-2 right-2">
-          <Badge status={status}>{statusLabels[status]}</Badge>
+        <div className="absolute top-2 left-2 flex items-center gap-2 flex-wrap max-w-[calc(100%-1rem)]">
+          <div
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gradient-to-br ${config.gradient} shadow-md`}
+            title={config.label}
+          >
+            <Icon className="w-4 h-4 text-white flex-shrink-0" />
+            <span className="text-white text-xs font-semibold">{config.label}</span>
+          </div>
+          <Badge status={status} className="!w-auto px-2.5 py-1 text-xs shadow-md">
+            {statusLabels[status]}
+          </Badge>
         </div>
       </div>
 

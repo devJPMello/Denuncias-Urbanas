@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsString, IsNotEmpty, IsEnum, IsOptional, IsNumber } from 'class-validator';
 
 export enum CategoriaDenuncia {
@@ -25,18 +26,26 @@ export class CreateDenunciaDto {
   @IsNotEmpty()
   endereco: string;
 
-  @IsString()
-  @IsOptional()
-  imagemUrl?: string;
-
+  @Transform(({ value }) => {
+    if (value === '' || value === undefined || value === null) return undefined;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  })
   @IsNumber()
   @IsOptional()
   lat?: number;
 
+  @Transform(({ value }) => {
+    if (value === '' || value === undefined || value === null) return undefined;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  })
   @IsNumber()
   @IsOptional()
   lng?: number;
 
-  /** Preenchido pelo guard JWT — não expor no body */
+  /** Preenchido pelo controller — não enviar no body */
   autorId?: string;
+  imagemBytes?: Buffer;
+  imagemMime?: string;
 }
