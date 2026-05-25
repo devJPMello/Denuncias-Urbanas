@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { SignIn } from '@clerk/clerk-react';
-import { MdArrowBack, MdLocationOn } from 'react-icons/md';
+import { MdArrowBack, MdLocationOn, MdNotifications, MdVerifiedUser } from 'react-icons/md';
 import { motion } from 'motion/react';
 import { useAppAuth, CLERK_ENABLED } from '../../lib/auth';
 
@@ -51,18 +51,22 @@ export function LoginScreen({ onBack, onLogin }: LoginScreenProps) {
             Faça parte da transformação da sua cidade. Registre, acompanhe e resolva.
           </p>
           <div className="mt-8 flex flex-col gap-3 text-left max-w-xs mx-auto">
-            {['Notificações em tempo real', 'Geolocalização precisa', 'Acompanhamento do status'].map((f, i) => (
+            {[
+              { icon: MdNotifications, label: 'Notificações em tempo real' },
+              { icon: MdLocationOn,    label: 'Geolocalização precisa'     },
+              { icon: MdVerifiedUser,  label: 'Plataforma segura'          },
+            ].map((f, i) => (
               <motion.div
                 key={i}
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.3 + i * 0.1 }}
-                className="flex items-center gap-2 text-white/90"
+                className="flex items-center gap-3 text-white/90"
               >
-                <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <div className="w-2 h-2 bg-white rounded-full" />
+                <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <f.icon className="w-5 h-5" />
                 </div>
-                <span className="text-sm">{f}</span>
+                <span className="text-sm font-medium">{f.label}</span>
               </motion.div>
             ))}
           </div>
