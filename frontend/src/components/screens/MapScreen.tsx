@@ -7,6 +7,8 @@ import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Textarea } from '../Textarea';
 import { motion } from 'motion/react';
+import { useDenuncias } from '../../hooks/api/useDenuncias';
+import { useCreateDenuncia } from '../../hooks/api/useCreateDenuncia';
 
 // ── Cores dos marcadores (matches theme.css) ──────────────────────────────────
 const CATEGORY_COLORS: Record<CategoryType, string> = {
@@ -16,13 +18,6 @@ const CATEGORY_COLORS: Record<CategoryType, string> = {
   calcada:    '#F97316',
   outros:     '#6B7280',
 };
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
-const mockReports: Array<{ id: string; category: CategoryType; address: string; lat: number; lng: number }> = [
-  { id: '1', category: 'buraco',     address: 'Av. Paulista, 1578 — Bela Vista',   lat: -23.5616, lng: -46.6564 },
-  { id: '2', category: 'lixo',       address: 'Rua Augusta, 2450 — Consolação',    lat: -23.5530, lng: -46.6500 },
-  { id: '3', category: 'iluminacao', address: 'Rua da Consolação, 3456',           lat: -23.5562, lng: -46.6490 },
-];
 
 const categories: CategoryType[] = ['buraco', 'lixo', 'iluminacao', 'calcada', 'outros'];
 
@@ -35,29 +30,34 @@ interface MapScreenProps {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
-  const [searchQuery, setSearchQuery]           = useState('');
+  const [searchQuery, setSearchQuery]               = useState('');
   const [showNewReportModal, setShowNewReportModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryType | null>(null);
-  const [description, setDescription]           = useState('');
-  const [image, setImage]                       = useState<string | null>(null);
-  const [submitted, setSubmitted]               = useState(false);
+  const [selectedCategory, setSelectedCategory]     = useState<CategoryType | null>(null);
+  const [description, setDescription]               = useState('');
+  const [image, setImage]                           = useState<string | null>(null);
+  const [submitted, setSubmitted]                   = useState(false);
   const mapContainerRef = useRef<HTMLElement & { _leafletLocate?: () => void } | null>(null);
 
-  const filteredReports = mockReports.filter(r =>
+  const { complaints, isLoading, refetch } = useDenuncias();
+  const { create, isLoading: isCreating }  = useCreateDenuncia();
+
+  const filteredReports = complaints.filter(r =>
     !searchQuery || r.address.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const markers: MapMarker[] = filteredReports.map(r => ({
-    id: r.id,
-    lat: r.lat,
-    lng: r.lng,
-    color: CATEGORY_COLORS[r.category],
-    popupHtml: `
-      <div style="font-family:sans-serif;font-size:13px;line-height:1.4">
-        <strong style="color:#1e293b">#${r.id} — ${r.category}</strong><br/>
-        <span style="color:#64748b">${r.address}</span>
-      </div>`,
-  }));
+  const markers: MapMarker[] = filteredReports
+    .filter(r => r.lat !== undefined && r.lng !== undefined)
+    .map(r => ({
+      id: r.id,
+      lat: r.lat!,
+      lng: r.lng!,
+      color: CATEGORY_COLORS[r.category],
+      popupHtml: `
+        <div style="font-family:sans-serif;font-size:13px;line-height:1.4">
+          <strong style="color:#1e293b">${r.title ?? r.category}</strong><br/>
+          <span style="color:#64748b">${r.address}</span>
+        </div>`,
+    }));
 
   const handleLocate = () => {
     (mapContainerRef.current as any)?._leafletLocate?.();
@@ -67,15 +67,29 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
     setImage('https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=400');
   };
 
-  const handleSubmit = () => {
-    setSubmitted(true);
-    setTimeout(() => {
-      setShowNewReportModal(false);
-      setSubmitted(false);
-      setSelectedCategory(null);
-      setDescription('');
-      setImage(null);
-    }, 2000);
+  const handleSubmit = async () => {
+    if (!selectedCategory) return;
+
+    try {
+      await create({
+        titulo:    `${selectedCategory} — denúncia`,
+        descricao: description || 'Sem descrição',
+        categoria: selectedCategory as any,
+        endereco:  'Quadra 104 Norte, Palmas, TO',  // TODO: usar geocoder real
+        imagemUrl: image ?? undefined,
+      });
+      setSubmitted(true);
+      refetch();
+      setTimeout(() => {
+        setShowNewReportModal(false);
+        setSubmitted(false);
+        setSelectedCategory(null);
+        setDescription('');
+        setImage(null);
+      }, 2000);
+    } catch {
+      // error handled by hook
+    }
   };
 
   return (
@@ -88,7 +102,7 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="font-bold">Denúncias Urbanas</h1>
-                <p className="text-white/80 text-xs">São Paulo, SP</p>
+                <p className="text-white/80 text-xs">Palmas, TO</p>
               </div>
               <div className="flex gap-2">
                 <button onClick={onMyReports} className="p-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-colors">
@@ -127,32 +141,40 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {filteredReports.map((report, i) => (
-                <motion.div
-                  key={report.id}
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-3 p-2.5 bg-gradient-to-r from-gray-50 to-white rounded-xl hover:shadow-md cursor-pointer transition-all border border-gray-100"
-                >
-                  <div
-                    className="w-3 h-3 rounded-full flex-shrink-0 shadow"
-                    style={{ background: CATEGORY_COLORS[report.category] }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{report.address}</p>
-                    <p className="text-xs text-gray-500 capitalize">{report.category}</p>
-                  </div>
-                  <span className="text-[11px] text-gray-400">2h</span>
-                </motion.div>
-              ))}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : filteredReports.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">Nenhuma ocorrência encontrada</p>
+              ) : (
+                filteredReports.map((report, i) => (
+                  <motion.div
+                    key={report.id}
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-center gap-3 p-2.5 bg-gradient-to-r from-gray-50 to-white rounded-xl hover:shadow-md cursor-pointer transition-all border border-gray-100"
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0 shadow"
+                      style={{ background: CATEGORY_COLORS[report.category] }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{report.address}</p>
+                      <p className="text-xs text-gray-500 capitalize">{report.category}</p>
+                    </div>
+                    <span className="text-[11px] text-gray-400">{report.date}</span>
+                  </motion.div>
+                ))
+              )}
             </div>
           </div>
 
           {/* Mapa */}
           <div className="flex-1 relative order-1 md:order-2 min-h-[40vh] md:min-h-0">
             <LeafletMap
-              center={[-23.5505, -46.6333]}
+              center={[-10.1840, -48.3336]}
               zoom={14}
               markers={markers}
               className="absolute inset-0"
@@ -259,12 +281,17 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
               <MdLocationOn className="w-6 h-6 text-primary flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-gray-900">Localização detectada</p>
-                <p className="text-sm text-gray-600 mt-1">Av. Paulista, 1578 — Bela Vista, São Paulo</p>
+                <p className="text-sm text-gray-600 mt-1">Quadra 104 Norte, Palmas, TO</p>
               </div>
             </div>
 
-            <Button size="lg" className="w-full" onClick={handleSubmit} disabled={!selectedCategory || !image}>
-              Enviar Denúncia
+            <Button
+              size="lg"
+              className="w-full"
+              onClick={handleSubmit}
+              disabled={!selectedCategory || !image || isCreating}
+            >
+              {isCreating ? 'Enviando...' : 'Enviar Denúncia'}
             </Button>
           </div>
         )}

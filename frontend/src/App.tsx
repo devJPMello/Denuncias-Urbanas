@@ -17,8 +17,9 @@ type Screen = 'splash' | 'login' | 'map' | 'my-reports' | 'report-detail' | 'adm
 type SettingType = 'notifications' | 'language' | 'help';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
-  const [settingType, setSettingType] = useState<SettingType>('notifications');
+  const [currentScreen, setCurrentScreen]   = useState<Screen>('splash');
+  const [settingType, setSettingType]       = useState<SettingType>('notifications');
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const { isSignedIn, isLoaded } = useAppAuth();
 
   useEffect(() => {
@@ -27,6 +28,11 @@ export default function App() {
       setCurrentScreen('map');
     }
   }, [isLoaded, isSignedIn]);
+
+  const navigateToDetail = (id: string) => {
+    setSelectedReportId(id);
+    setCurrentScreen('report-detail');
+  };
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -74,11 +80,16 @@ export default function App() {
         return (
           <MyReportsScreen
             onBack={() => setCurrentScreen('map')}
-            onReportClick={() => setCurrentScreen('report-detail')}
+            onReportClick={navigateToDetail}
           />
         );
       case 'report-detail':
-        return <ReportDetailScreen onBack={() => setCurrentScreen('my-reports')} />;
+        return (
+          <ReportDetailScreen
+            reportId={selectedReportId}
+            onBack={() => setCurrentScreen('my-reports')}
+          />
+        );
       case 'admin':
         return <AdminPanelScreen onLogout={() => setCurrentScreen('login')} />;
       default:

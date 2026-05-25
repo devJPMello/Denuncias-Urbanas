@@ -1,4 +1,4 @@
-// ── Denúncias ─────────────────────────────────────────────────────────────────
+// ── Denúncias (frontend model) ────────────────────────────────────────────────
 
 export type ComplaintStatus   = 'open' | 'analysis' | 'resolved';
 export type ComplaintCategory = 'buraco' | 'lixo' | 'iluminacao' | 'calcada' | 'outros';
@@ -7,12 +7,107 @@ export interface Complaint {
   id:        string;
   category:  ComplaintCategory;
   address:   string;
-  date:      string;
+  date:      string;       // formatted pt-BR date string
   status:    ComplaintStatus;
   image?:    string;
   lat?:      number;
   lng?:      number;
+  description?: string;
+  title?:    string;
 }
+
+// ── Backend API types (espelham o Prisma/NestJS) ──────────────────────────────
+
+/** Status vindo do backend (enum Prisma em português). */
+export type ApiStatus = 'aberto' | 'analise' | 'resolvido';
+
+/** Categoria vinda do backend. */
+export type ApiCategory = 'buraco' | 'lixo' | 'iluminacao' | 'calcada' | 'vandalismo' | 'outros';
+
+/** Forma do objeto Denuncia retornado pelo backend. */
+export interface ApiDenuncia {
+  id:          string;
+  titulo:      string;
+  descricao:   string;
+  categoria:   ApiCategory;
+  endereco:    string;
+  imagemUrl:   string | null;
+  status:      ApiStatus;
+  lat:         number | null;
+  lng:         number | null;
+  autorId:     string;
+  criadoEm:   string;   // ISO-8601 string
+  atualizadoEm: string;
+  autor?: {
+    id:    string;
+    nome:  string;
+    email: string;
+  };
+}
+
+/** Payload para criar uma nova denúncia. */
+export interface CreateDenunciaPayload {
+  titulo:    string;
+  descricao: string;
+  categoria: ApiCategory;
+  endereco:  string;
+  imagemUrl?: string;
+  lat?:      number;
+  lng?:      number;
+}
+
+/** Payload para atualizar uma denúncia (admin). */
+export interface UpdateDenunciaPayload {
+  status?: ApiStatus;
+  titulo?: string;
+  descricao?: string;
+  categoria?: ApiCategory;
+  endereco?: string;
+}
+
+// ── Mappers ───────────────────────────────────────────────────────────────────
+
+const STATUS_MAP: Record<ApiStatus, ComplaintStatus> = {
+  aberto:    'open',
+  analise:   'analysis',
+  resolvido: 'resolved',
+};
+
+const STATUS_MAP_REVERSE: Record<ComplaintStatus, ApiStatus> = {
+  open:     'aberto',
+  analysis: 'analise',
+  resolved: 'resolvido',
+};
+
+/** Normaliza categorias que podem diferir entre backend e frontend. */
+function normalizeCategory(cat: ApiCategory): ComplaintCategory {
+  if (cat === 'vandalismo') return 'outros';
+  return cat as ComplaintCategory;
+}
+
+/** Formata uma string ISO-8601 em data pt-BR (dd/mm/yyyy). */
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR');
+}
+
+/** Converte um ApiDenuncia para o modelo frontend Complaint. */
+export function mapApiDenuncia(d: ApiDenuncia): Complaint {
+  return {
+    id:          d.id,
+    category:    normalizeCategory(d.categoria),
+    address:     d.endereco,
+    date:        formatDate(d.criadoEm),
+    status:      STATUS_MAP[d.status] ?? 'open',
+    image:       d.imagemUrl ?? undefined,
+    lat:         d.lat ?? undefined,
+    lng:         d.lng ?? undefined,
+    description: d.descricao,
+    title:       d.titulo,
+  };
+}
+
+export { STATUS_MAP, STATUS_MAP_REVERSE };
 
 // ── Notificações in-app ───────────────────────────────────────────────────────
 

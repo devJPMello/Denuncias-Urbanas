@@ -11,20 +11,20 @@ import { Modal } from '../Modal';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapAdminScreen } from './MapAdminScreen';
 import { ReportsScreen } from './ReportsScreen';
+import { useDenuncias } from '../../hooks/api/useDenuncias';
+import { useUpdateDenuncia } from '../../hooks/api/useUpdateDenuncia';
+import type { Complaint } from '../../types';
+import type { ApiStatus } from '../../types';
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
-
-const mockReports = [
-  { id: '1', category: 'buraco' as CategoryType, address: 'Av. Paulista, 1578 - Bela Vista',      date: '18/05/2026', status: 'analysis' as const, neighborhood: 'Bela Vista'  },
-  { id: '2', category: 'lixo'  as CategoryType, address: 'Rua Augusta, 2450 - Consolação',        date: '15/05/2026', status: 'open'     as const, neighborhood: 'Consolação'  },
-  { id: '3', category: 'iluminacao' as CategoryType, address: 'Rua da Consolação, 3456',          date: '10/05/2026', status: 'resolved' as const, neighborhood: 'Consolação'  },
-  { id: '4', category: 'calcada' as CategoryType, address: 'Av. Rebouças, 1000',                  date: '12/05/2026', status: 'open'     as const, neighborhood: 'Pinheiros'   },
-];
-
-type Report = typeof mockReports[0];
-
-const statusLabels = { open: 'Aberto', analysis: 'Em Análise', resolved: 'Resolvido' };
 type AdminView = 'map' | 'calls' | 'reports';
+const statusLabels = { open: 'Aberto', analysis: 'Em Análise', resolved: 'Resolvido' };
+
+// ── Status maps for the action dropdown ──────────────────────────────────────
+const FRONTEND_TO_API: Record<string, ApiStatus> = {
+  open:     'aberto',
+  analysis: 'analise',
+  resolved: 'resolvido',
+};
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -33,21 +33,18 @@ interface AdminPanelScreenProps {
 }
 
 export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
-  // ── Existing UI state ──────────────────────────────────────────────────────
   const [currentView, setCurrentView]         = useState<AdminView>('calls');
   const [selectedStatus, setSelectedStatus]   = useState<'all' | 'open' | 'analysis' | 'resolved'>('all');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'all'>('all');
   const [search, setSearch]                   = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [isLoadingTable, setIsLoadingTable]   = useState(false);
-  // Inicia aberta no desktop, fechada no mobile
   const [sidebarOpen, setSidebarOpen] = useState(
     () => typeof window !== 'undefined' && window.innerWidth >= 768,
   );
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  // ── Finalize-report modal state ────────────────────────────────────────────
-  const [selectedReport, setSelectedReport]   = useState<Report | null>(null);
+  // Finalize modal state
+  const [selectedReport, setSelectedReport]   = useState<Complaint | null>(null);
   const [resolveModalOpen, setResolveModalOpen] = useState(false);
   const [imagePreview, setImagePreview]       = useState<string | null>(null);
   const [observation, setObservation]         = useState('');
@@ -55,8 +52,10 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
   const [isFinalized, setIsFinalized]         = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Derived data ───────────────────────────────────────────────────────────
-  const filteredReports = mockReports.filter(report => {
+  const { complaints, isLoading, refetch } = useDenuncias();
+  const { update }                          = useUpdateDenuncia();
+
+  const filteredReports = complaints.filter(report => {
     const statusMatch   = selectedStatus   === 'all' || report.status   === selectedStatus;
     const categoryMatch = selectedCategory === 'all' || report.category === selectedCategory;
     const searchMatch   = !search || report.address.toLowerCase().includes(search.toLowerCase());
@@ -64,10 +63,10 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
   });
 
   const stats = {
-    total:    mockReports.length,
-    open:     mockReports.filter(r => r.status === 'open').length,
-    analysis: mockReports.filter(r => r.status === 'analysis').length,
-    resolved: mockReports.filter(r => r.status === 'resolved').length,
+    total:    complaints.length,
+    open:     complaints.filter(r => r.status === 'open').length,
+    analysis: complaints.filter(r => r.status === 'analysis').length,
+    resolved: complaints.filter(r => r.status === 'resolved').length,
   };
 
   const statCards: Array<{
@@ -83,7 +82,6 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
     { label: 'Resolvidos', value: stats.resolved,  gradient: 'from-green-500 to-emerald-500', shadow: 'shadow-green-500/20', filter: 'resolved' },
   ];
 
-  // ── Side-effects ───────────────────────────────────────────────────────────
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node))
@@ -93,16 +91,8 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (currentView === 'calls') {
-      setIsLoadingTable(true);
-      const t = setTimeout(() => setIsLoadingTable(false), 800);
-      return () => clearTimeout(t);
-    }
-  }, [selectedStatus, selectedCategory, search, currentView]);
-
-  // ── Modal handlers ─────────────────────────────────────────────────────────
-  const handleRowClick = (report: Report) => {
+  // Modal handlers
+  const handleRowClick = (report: Complaint) => {
     setSelectedReport(report);
     setImagePreview(null);
     setObservation('');
@@ -129,12 +119,30 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
     if (file) handleImageSelect(file);
   };
 
-  const handleFinalize = () => {
-    setIsFinalized(true);
-    setTimeout(() => {
-      handleModalOpenChange(false);
-      setIsFinalized(false);
-    }, 1600);
+  const handleFinalize = async () => {
+    if (!selectedReport) return;
+    try {
+      await update(selectedReport.id, { status: 'resolvido' });
+      setIsFinalized(true);
+      refetch();
+      setTimeout(() => {
+        handleModalOpenChange(false);
+        setIsFinalized(false);
+      }, 1600);
+    } catch {
+      // Silently fail — UI shows current state
+    }
+  };
+
+  const handleStatusChange = async (reportId: string, newStatus: string) => {
+    const apiStatus = FRONTEND_TO_API[newStatus];
+    if (!apiStatus) return;
+    try {
+      await update(reportId, { status: apiStatus });
+      refetch();
+    } catch {
+      // ignore
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -161,8 +169,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
         md:relative md:inset-auto md:z-auto md:translate-x-0
         ${sidebarOpen ? 'md:w-56' : 'md:w-14'}
       `}>
-
-        {/* Botão flutuante de toggle — desktop only */}
+        {/* Botão flutuante de toggle */}
         <button
           onClick={() => setSidebarOpen(v => !v)}
           className="hidden md:flex absolute -right-3 top-6 z-20 w-6 h-6 bg-white border border-border rounded-full items-center justify-center shadow-sm hover:shadow-md hover:bg-gray-50 transition-all"
@@ -179,13 +186,11 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
             <div className="bg-gradient-to-br from-primary to-blue-600 rounded-xl p-2 shadow-md shadow-primary/30 flex-shrink-0">
               <MdLocationOn className="w-5 h-5 text-white" />
             </div>
-            {/* Label — some only when expanded */}
             <div className={`overflow-hidden transition-all duration-200 whitespace-nowrap ${sidebarOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0'}`}>
               <h1 className="font-bold text-sm">Painel</h1>
               <p className="text-[11px] text-muted-foreground">Municipal</p>
             </div>
           </div>
-          {/* X — mobile only */}
           <button onClick={() => setSidebarOpen(false)} className="md:hidden ml-2 p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
             <MdClose className="w-4 h-4 text-gray-500" />
           </button>
@@ -267,7 +272,6 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
         {currentView !== 'reports' && (
           <header className="bg-white border-b border-border">
             <div className="px-4 py-3 flex items-center gap-3 min-w-0">
-              {/* Abre o overlay só no mobile */}
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
@@ -279,7 +283,9 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
                   {currentView === 'map' ? 'Mapa de Ocorrências' : 'Fila de Chamados'}
                 </h2>
                 <p className="text-gray-500 text-xs truncate">
-                  {currentView === 'map' ? 'Visualização geográfica' : `${filteredReports.length} chamado(s)`}
+                  {currentView === 'map'
+                    ? 'Visualização geográfica'
+                    : isLoading ? 'Carregando...' : `${filteredReports.length} chamado(s)`}
                 </p>
               </div>
             </div>
@@ -358,7 +364,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
             </div>
 
             {/* Table */}
-            {isLoadingTable ? (
+            {isLoading ? (
               <SkeletonTable rows={8} />
             ) : (
               <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
@@ -366,7 +372,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
                   <table className="w-full min-w-[640px]">
                     <thead className="bg-gray-50 border-b border-border">
                       <tr>
-                        {['ID', 'Categoria', 'Endereço', 'Bairro', 'Data', 'Status', 'Ação'].map(h => (
+                        {['ID', 'Categoria', 'Endereço', 'Data', 'Status', 'Ação'].map(h => (
                           <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">{h}</th>
                         ))}
                       </tr>
@@ -381,7 +387,9 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
                             onClick={() => handleRowClick(report)}
                             className="border-t border-border hover:bg-blue-50/50 transition-colors cursor-pointer group"
                           >
-                            <td className="px-4 py-2.5 text-sm font-medium text-gray-500">#{report.id}</td>
+                            <td className="px-4 py-2.5 text-sm font-medium text-gray-500 font-mono">
+                              {report.id.slice(0, 8)}…
+                            </td>
                             <td className="px-4 py-2.5">
                               <div className="flex items-center gap-2">
                                 <div className={`p-1.5 rounded-lg bg-gradient-to-br ${config.gradient}`}>
@@ -390,23 +398,27 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
                                 <span className="text-sm capitalize">{report.category}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-2.5 text-sm text-gray-700">{report.address}</td>
-                            <td className="px-4 py-2.5 text-sm text-gray-700">{report.neighborhood}</td>
+                            <td className="px-4 py-2.5 text-sm text-gray-700 max-w-[220px] truncate">
+                              {report.address}
+                            </td>
                             <td className="px-4 py-2.5 text-sm text-gray-500">{report.date}</td>
                             <td className="px-4 py-2.5">
                               <Badge status={report.status}>{statusLabels[report.status]}</Badge>
                             </td>
                             <td className="px-4 py-2.5">
-                              {/* Stop row-click from firing when interacting with this select */}
                               <select
                                 onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleStatusChange(report.id, e.target.value);
+                                }}
+                                defaultValue=""
                                 className="px-2 py-1 text-xs rounded-lg bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                               >
-                                <option>Alterar</option>
-                                <option>Aberto</option>
-                                <option>Em Análise</option>
-                                <option>Resolvido</option>
+                                <option value="" disabled>Alterar</option>
+                                <option value="open">Aberto</option>
+                                <option value="analysis">Em Análise</option>
+                                <option value="resolved">Resolvido</option>
                               </select>
                             </td>
                           </tr>
@@ -424,13 +436,12 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
         )}
       </div>
 
-
       {/* ── Finalize-report modal ─────────────────────────────────────────────── */}
       {selectedReport && (
         <Modal
           open={resolveModalOpen}
           onOpenChange={handleModalOpenChange}
-          title={`Finalizar Chamado #${selectedReport.id}`}
+          title={`Finalizar Chamado`}
           subtitle={selectedReport.address}
         >
           <div className="space-y-4">
@@ -455,9 +466,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
                 </Badge>
               </div>
               <p className="text-sm text-gray-700">{selectedReport.address}</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {selectedReport.neighborhood} · {selectedReport.date}
-              </p>
+              <p className="text-xs text-gray-400 mt-1">{selectedReport.date}</p>
             </div>
 
             {/* Image upload */}
@@ -468,20 +477,11 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
               </p>
 
               {imagePreview ? (
-                /* Preview */
                 <div className="relative rounded-xl overflow-hidden border border-gray-200">
-                  <img
-                    src={imagePreview}
-                    alt="Comprovante"
-                    className="w-full object-cover max-h-52"
-                  />
+                  <img src={imagePreview} alt="Comprovante" className="w-full object-cover max-h-52" />
                   <button
-                    onClick={() => {
-                      URL.revokeObjectURL(imagePreview);
-                      setImagePreview(null);
-                    }}
+                    onClick={() => { URL.revokeObjectURL(imagePreview); setImagePreview(null); }}
                     className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
-                    aria-label="Remover imagem"
                   >
                     <MdClose className="w-4 h-4" />
                   </button>
@@ -490,7 +490,6 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
                   </div>
                 </div>
               ) : (
-                /* Drop zone */
                 <div
                   onDrop={handleDrop}
                   onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
@@ -550,20 +549,15 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
                 className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md shadow-green-500/20 hover:shadow-lg hover:shadow-green-500/30 transition-all disabled:opacity-80 flex items-center justify-center gap-2"
               >
                 {isFinalized ? (
-                  <>
-                    <MdCheckCircle className="w-4 h-4" />
-                    Finalizado!
-                  </>
+                  <><MdCheckCircle className="w-4 h-4" /> Finalizado!</>
                 ) : (
                   'Finalizar Chamado'
                 )}
               </button>
             </div>
-
           </div>
         </Modal>
       )}
-
     </div>
   );
 }

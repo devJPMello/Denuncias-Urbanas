@@ -5,7 +5,7 @@ import { MdLocationOn, MdCalendarToday } from 'react-icons/md';
 interface ReportCardProps {
   id: string;
   category: CategoryType;
-  image: string;
+  image?: string;
   address: string;
   date: string;
   status: 'open' | 'analysis' | 'resolved';
@@ -18,6 +18,8 @@ const statusLabels = {
   resolved: 'Resolvido'
 };
 
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjRjNGNEY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOUI5QkFEIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2VtIGZvdG88L3RleHQ+PC9zdmc+';
+
 export function ReportCard({ category, image, address, date, status, onClick }: ReportCardProps) {
   const Icon = categoryConfig[category].icon;
   const config = categoryConfig[category];
@@ -28,7 +30,7 @@ export function ReportCard({ category, image, address, date, status, onClick }: 
       className="bg-white rounded-xl shadow-sm border border-border overflow-hidden cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
     >
       <div className="relative h-32">
-        <img src={image} alt="Denúncia" className="w-full h-full object-cover" />
+        <img src={image ?? PLACEHOLDER_IMAGE} alt="Denúncia" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
         <div className={`absolute top-2 left-2 p-1.5 rounded-lg bg-gradient-to-br ${config.gradient} shadow-md`}>
           <Icon className="w-4 h-4 text-white" />

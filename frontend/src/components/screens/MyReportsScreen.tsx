@@ -1,38 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MdArrowBack } from 'react-icons/md';
 import { ReportCard } from '../ReportCard';
-import { CategoryType } from '../CategoryChip';
 import { EmptyState } from '../EmptyState';
 import { SkeletonCard } from '../Skeleton';
 import { motion, AnimatePresence } from 'motion/react';
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
-const mockReports = [
-  {
-    id: '1',
-    category: 'buraco' as CategoryType,
-    image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=600',
-    address: 'Av. Paulista, 1578 — Bela Vista',
-    date: '18/05/2026',
-    status: 'analysis' as const,
-  },
-  {
-    id: '2',
-    category: 'lixo' as CategoryType,
-    image: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=600',
-    address: 'Rua Augusta, 2450 — Consolação',
-    date: '15/05/2026',
-    status: 'open' as const,
-  },
-  {
-    id: '3',
-    category: 'iluminacao' as CategoryType,
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600',
-    address: 'Rua da Consolação, 3456',
-    date: '10/05/2026',
-    status: 'resolved' as const,
-  },
-];
+import { useMyDenuncias } from '../../hooks/api/useMyDenuncias';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface MyReportsScreenProps {
@@ -42,22 +14,18 @@ interface MyReportsScreenProps {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function MyReportsScreen({ onBack, onReportClick }: MyReportsScreenProps) {
-  const [filter, setFilter]       = useState<'all' | 'open' | 'analysis' | 'resolved'>('all');
-  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'open' | 'analysis' | 'resolved'>('all');
 
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 1200);
-    return () => clearTimeout(t);
-  }, []);
+  const { complaints, isLoading, error, refetch } = useMyDenuncias();
 
   const filteredReports =
-    filter === 'all' ? mockReports : mockReports.filter(r => r.status === filter);
+    filter === 'all' ? complaints : complaints.filter(r => r.status === filter);
 
   const filterOptions = [
-    { value: 'all',      label: 'Todas',      count: mockReports.length },
-    { value: 'open',     label: 'Abertas',    count: mockReports.filter(r => r.status === 'open').length },
-    { value: 'analysis', label: 'Em Análise', count: mockReports.filter(r => r.status === 'analysis').length },
-    { value: 'resolved', label: 'Resolvidas', count: mockReports.filter(r => r.status === 'resolved').length },
+    { value: 'all',      label: 'Todas',      count: complaints.length },
+    { value: 'open',     label: 'Abertas',    count: complaints.filter(r => r.status === 'open').length },
+    { value: 'analysis', label: 'Em Análise', count: complaints.filter(r => r.status === 'analysis').length },
+    { value: 'resolved', label: 'Resolvidas', count: complaints.filter(r => r.status === 'resolved').length },
   ];
 
   return (
@@ -77,7 +45,9 @@ export function MyReportsScreen({ onBack, onReportClick }: MyReportsScreenProps)
             </button>
             <div className="flex-1">
               <h2 className="font-bold">Minhas Denúncias</h2>
-              <p className="text-white/80 text-xs">{mockReports.length} denúncias registradas</p>
+              <p className="text-white/80 text-xs">
+                {isLoading ? 'Carregando...' : `${complaints.length} denúncia${complaints.length !== 1 ? 's' : ''} registrada${complaints.length !== 1 ? 's' : ''}`}
+              </p>
             </div>
           </div>
 
@@ -113,7 +83,17 @@ export function MyReportsScreen({ onBack, onReportClick }: MyReportsScreenProps)
           transition={{ duration: 0.18 }}
           className="flex-1 overflow-y-auto p-4"
         >
-          {isLoading ? (
+          {error ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
+              <p className="text-sm text-red-500 text-center">{error}</p>
+              <button
+                onClick={refetch}
+                className="px-4 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          ) : isLoading ? (
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
             </div>
@@ -124,9 +104,17 @@ export function MyReportsScreen({ onBack, onReportClick }: MyReportsScreenProps)
                   key={report.id}
                   initial={{ y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: i * 0.1 }}
+                  transition={{ delay: i * 0.08 }}
                 >
-                  <ReportCard {...report} onClick={() => onReportClick(report.id)} />
+                  <ReportCard
+                    id={report.id}
+                    category={report.category}
+                    image={report.image}
+                    address={report.address}
+                    date={report.date}
+                    status={report.status}
+                    onClick={() => onReportClick(report.id)}
+                  />
                 </motion.div>
               ))}
             </div>

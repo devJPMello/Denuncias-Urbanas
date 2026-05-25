@@ -24,6 +24,14 @@ export class DenunciasService {
     });
   }
 
+  findByAutorId(autorId: string) {
+    return this.prisma.denuncia.findMany({
+      where: { autorId },
+      include: { autor: { select: { id: true, nome: true, email: true } } },
+      orderBy: { criadoEm: 'desc' },
+    });
+  }
+
   async findOne(id: string) {
     const denuncia = await this.prisma.denuncia.findUnique({
       where: { id },
