@@ -3,7 +3,9 @@
  * All methods throw on non-2xx responses.
  */
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000';
+// Em dev, usa URL relativa → Vite proxy encaminha /api/* → http://localhost:3000/api/*
+// Em produção, defina VITE_API_URL=https://seu-backend.com/api (sem barra final)
+const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
 
 // ── Internal request helper ───────────────────────────────────────────────────
 
