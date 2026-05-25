@@ -1,7 +1,7 @@
 // ── Denúncias (frontend model) ────────────────────────────────────────────────
 
 export type ComplaintStatus   = 'open' | 'analysis' | 'resolved';
-export type ComplaintCategory = 'buraco' | 'lixo' | 'iluminacao' | 'calcada' | 'outros';
+export type ComplaintCategory = 'buraco' | 'lixo' | 'iluminacao' | 'calcada' | 'vandalismo' | 'outros';
 
 export interface Complaint {
   id:        string;
@@ -79,9 +79,8 @@ const STATUS_MAP_REVERSE: Record<ComplaintStatus, ApiStatus> = {
   resolved: 'resolvido',
 };
 
-/** Normaliza categorias que podem diferir entre backend e frontend. */
+/** Normaliza categorias do backend para o modelo frontend. */
 function normalizeCategory(cat: ApiCategory): ComplaintCategory {
-  if (cat === 'vandalismo') return 'outros';
   return cat as ComplaintCategory;
 }
 

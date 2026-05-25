@@ -1,12 +1,16 @@
 /**
- * LeafletMap — mapa real com tiles do OpenStreetMap.
+ * LeafletMap — mapa real com tiles do OpenStreetMap e clustering de marcadores.
  *
  * Usa a API nativa do Leaflet (não react-leaflet) para ter controle total
  * sobre inicialização e limpeza, evitando erros de "container already used".
+ * Utiliza leaflet.markercluster para agrupar pins próximos automaticamente.
  */
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -21,7 +25,6 @@ export interface MapMarker {
 }
 
 export interface LeafletMapProps {
-  /** Centro inicial [lat, lng] — padrão: Av. Paulista, São Paulo */
   center?: [number, number];
   zoom?: number;
   markers?: MapMarker[];
@@ -63,7 +66,7 @@ export function LeafletMap({
 }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<L.Map | null>(null);
-  const layerRef     = useRef<L.LayerGroup | null>(null);
+  const clusterRef   = useRef<L.MarkerClusterGroup | null>(null);
 
   // ── Inicializa o mapa UMA vez ──────────────────────────────────────────────
   useEffect(() => {
@@ -72,7 +75,7 @@ export function LeafletMap({
     const map = L.map(containerRef.current, {
       center,
       zoom,
-      zoomControl: false, // controles customizados na UI
+      zoomControl: false,
       attributionControl: true,
     });
 
@@ -81,23 +84,49 @@ export function LeafletMap({
       maxZoom: 19,
     }).addTo(map);
 
-    layerRef.current = L.layerGroup().addTo(map);
+    // Grupo de clustering — agrupa pins próximos e desagrupa ao dar zoom
+    const cluster = L.markerClusterGroup({
+      spiderfyOnMaxZoom:   true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      maxClusterRadius:    60,
+      iconCreateFunction: (c) => {
+        const count = c.getChildCount();
+        return L.divIcon({
+          html: `<div style="
+            width:40px;height:40px;
+            background:linear-gradient(135deg,#2563EB,#3B82F6);
+            border:3px solid #fff;
+            border-radius:50%;
+            display:flex;align-items:center;justify-content:center;
+            color:#fff;font-weight:700;font-size:13px;
+            box-shadow:0 2px 8px rgba(37,99,235,.4);
+          ">${count}</div>`,
+          className: '',
+          iconSize: [40, 40],
+          iconAnchor: [20, 20],
+        });
+      },
+    });
+
+    map.addLayer(cluster);
     mapRef.current   = map;
+    clusterRef.current = cluster;
 
     return () => {
       map.remove();
-      mapRef.current  = null;
-      layerRef.current = null;
+      mapRef.current   = null;
+      clusterRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Atualiza marcadores sempre que mudam ───────────────────────────────────
   useEffect(() => {
-    const layer = layerRef.current;
-    if (!layer) return;
+    const cluster = clusterRef.current;
+    if (!cluster) return;
 
-    layer.clearLayers();
+    cluster.clearLayers();
 
     markers.forEach((m) => {
       const marker = L.marker([m.lat, m.lng], { icon: makePinIcon(m.color) });
@@ -111,14 +140,16 @@ export function LeafletMap({
         if (m.popupHtml) marker.openPopup();
       });
 
-      layer.addLayer(marker);
+      cluster.addLayer(marker);
     });
   }, [markers, onMarkerClick]);
 
   // ── Expõe método de localizar usuário via ref no container ─────────────────
-  // (chamado pelos botões de controle nas telas)
   useEffect(() => {
-    const el = containerRef.current as HTMLElement & { _leafletLocate?: () => void; _leafletFlyTo?: (lat: number, lng: number, z?: number) => void };
+    const el = containerRef.current as HTMLElement & {
+      _leafletLocate?: () => void;
+      _leafletFlyTo?: (lat: number, lng: number, z?: number) => void;
+    };
     if (!el) return;
     el._leafletLocate = () => {
       mapRef.current?.locate({ setView: true, maxZoom: 16 });

@@ -5,6 +5,7 @@ import { clientsClaim } from 'workbox-core';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { CacheFirst, NetworkFirst } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
 
 // Extend the SW global with the injected precache manifest token
 declare const self: ServiceWorkerGlobalScope;
@@ -51,6 +52,13 @@ registerRoute(
     request.destination === 'image' || request.destination === 'font',
   new CacheFirst({
     cacheName: 'static-assets',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries:     60,                   // máximo 60 arquivos em cache
+        maxAgeSeconds:  30 * 24 * 60 * 60,   // 30 dias
+        purgeOnQuotaError: true,
+      }),
+    ],
   }),
 );
 
