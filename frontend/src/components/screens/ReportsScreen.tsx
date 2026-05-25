@@ -81,25 +81,32 @@ export function ReportsScreen() {
   ];
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Relatórios e Análises</h2>
-            <p className="text-sm text-gray-500 mt-1">Visão geral do desempenho e indicadores</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value as typeof selectedPeriod)}
-              className="px-3 py-2 text-sm rounded-lg bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-            >
-              <option value="week">Última semana</option>
-              <option value="month">Último mês</option>
-              <option value="year">Último ano</option>
-            </select>
-            <ExportButton variant="primary" size="md" onExport={(format) => console.log(`Exportando em ${format}`)} />
-          </div>
+    <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="p-3 md:p-4 pt-16 md:pt-4 space-y-4">
+        <div className="md:hidden">
+          <h2 className="text-lg font-bold text-gray-900">Relatórios</h2>
+          <p className="text-xs text-gray-500">Indicadores e análises</p>
+        </div>
+        <div className="hidden md:block">
+          <h2 className="text-xl font-bold text-gray-900">Relatórios e Análises</h2>
+          <p className="text-sm text-gray-500 mt-1">Visão geral do desempenho e indicadores</p>
+        </div>
+
+        <div className="flex flex-row items-center gap-2">
+          <select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value as typeof selectedPeriod)}
+            className="flex-1 min-w-0 px-3 py-2.5 text-sm rounded-xl bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="week">Última semana</option>
+            <option value="month">Último mês</option>
+            <option value="year">Último ano</option>
+          </select>
+          <ExportButton
+            variant="primary"
+            size="md"
+            onExport={(format) => console.log(`Exportando em ${format}`)}
+          />
         </div>
 
         {isLoading ? (
@@ -108,24 +115,24 @@ export function ReportsScreen() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               {stats.map((stat, i) => (
                 <motion.div
                   key={stat.label}
                   initial={{ y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: i * 0.05 }}
-                  className={`bg-gradient-to-br ${stat.gradient} text-white rounded-xl p-4 shadow-lg ${stat.shadow}`}
+                  className={`bg-gradient-to-br ${stat.gradient} text-white rounded-xl p-3 md:p-4 shadow-lg ${stat.shadow}`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <stat.icon className="w-8 h-8 text-white/80" />
+                  <div className="flex items-center justify-between mb-1 md:mb-2">
+                    <stat.icon className="w-6 h-6 md:w-8 md:h-8 text-white/80" />
                     {stat.trend === 'up'
                       ? <MdTrendingUp className="w-5 h-5 text-white/60" />
                       : <MdTrendingDown className="w-5 h-5 text-white/60" />
                     }
                   </div>
-                  <p className="text-2xl font-bold mb-1">{stat.value}</p>
-                  <p className="text-sm text-white/80">{stat.label}</p>
+                  <p className="text-xl md:text-2xl font-bold mb-0.5 md:mb-1">{stat.value}</p>
+                  <p className="text-[11px] md:text-sm text-white/80 leading-tight">{stat.label}</p>
                 </motion.div>
               ))}
             </div>
@@ -135,7 +142,7 @@ export function ReportsScreen() {
                 className="bg-white rounded-xl shadow-sm border border-border p-4">
                 <h3 className="font-bold text-gray-900 mb-1">Denúncias por Mês</h3>
                 <p className="text-xs text-gray-500 mb-4">Evolução mensal de chamados</p>
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={220} className="md:!h-[280px]">
                   <BarChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis dataKey="month" stroke="#6B7280" fontSize={12} />
@@ -152,7 +159,7 @@ export function ReportsScreen() {
                 className="bg-white rounded-xl shadow-sm border border-border p-4">
                 <h3 className="font-bold text-gray-900 mb-1">Distribuição por Categoria</h3>
                 <p className="text-xs text-gray-500 mb-4">Total: {total} denúncias</p>
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={220} className="md:!h-[280px]">
                   <PieChart>
                     <Pie
                       data={categoryData}
@@ -175,7 +182,7 @@ export function ReportsScreen() {
                 className="bg-white rounded-xl shadow-sm border border-border p-4">
                 <h3 className="font-bold text-gray-900 mb-1">Tendência de Resolução</h3>
                 <p className="text-xs text-gray-500 mb-4">Chamados resolvidos vs. total</p>
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={220} className="md:!h-[280px]">
                   <LineChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis dataKey="month" stroke="#6B7280" fontSize={12} />
