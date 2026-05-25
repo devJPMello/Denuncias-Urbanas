@@ -130,6 +130,10 @@ export interface ComplaintUpdatedPayload {
   updatedAt:  string;
 }
 
+export interface ComplaintCreatedPayload {
+  denunciaId: string;
+}
+
 export interface NotificationNewPayload {
   title:      string;
   body:       string;

@@ -70,7 +70,11 @@ export class PushService implements OnModuleInit {
       return;
     }
 
-    const body = JSON.stringify(payload);
+    const body = JSON.stringify({
+      title: payload.titulo,
+      body:  payload.mensagem,
+      url:   payload.url,
+    });
 
     await Promise.allSettled(
       subscriptions.map(async (sub) => {

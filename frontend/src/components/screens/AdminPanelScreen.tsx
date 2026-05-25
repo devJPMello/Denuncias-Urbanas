@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MapAdminScreen } from './MapAdminScreen';
 import { ReportsScreen } from './ReportsScreen';
 import { useDenuncias } from '../../hooks/api/useDenuncias';
+import { useDenunciasLiveSync } from '../../hooks/useDenunciasLiveSync';
 import { useUpdateDenuncia } from '../../hooks/api/useUpdateDenuncia';
 import type { Complaint } from '../../types';
 import type { ApiStatus } from '../../types';
@@ -54,6 +55,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
 
   const { complaints, isLoading, refetch } = useDenuncias();
   const { update }                          = useUpdateDenuncia();
+  useDenunciasLiveSync();
 
   const filteredReports = complaints.filter(report => {
     const statusMatch   = selectedStatus   === 'all' || report.status   === selectedStatus;
@@ -407,15 +409,14 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
                             </td>
                             <td className="px-4 py-2.5">
                               <select
+                                value={report.status}
                                 onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   e.stopPropagation();
                                   handleStatusChange(report.id, e.target.value);
                                 }}
-                                defaultValue=""
                                 className="px-2 py-1 text-xs rounded-lg bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                               >
-                                <option value="" disabled>Alterar</option>
                                 <option value="open">Aberto</option>
                                 <option value="analysis">Em Análise</option>
                                 <option value="resolved">Resolvido</option>

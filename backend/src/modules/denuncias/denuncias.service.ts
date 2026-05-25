@@ -1,20 +1,21 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { Prisma } from '@prisma/client';
+import { Prisma, StatusDenuncia } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDenunciaDto } from './dto/create-denuncia.dto';
 import { UpdateDenunciaDto } from './dto/update-denuncia.dto';
 import { mapDenunciaPublica, DenunciaPublica } from './denuncia.mapper';
 import {
-  QUEUE_COMPLAINT_ASSIGNMENT,
-  JOB_ASSIGN_COMPLAINT,
-  AssignComplaintJob,
+  QUEUE_PUSH_NOTIFICATION,
+  JOB_SEND_PUSH,
+  SendPushJob,
 } from '../queue/queue.constants';
 import { GeocodeService } from '../geocode/geocode.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const DENUNCIA_LIST_INCLUDE = {
   autor: { select: { id: true, nome: true, email: true } },
@@ -40,10 +41,13 @@ const DENUNCIA_LIST_SELECT = {
 
 @Injectable()
 export class DenunciasService {
+  private readonly logger = new Logger(DenunciasService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly geocode: GeocodeService,
-    @InjectQueue(QUEUE_COMPLAINT_ASSIGNMENT) private readonly assignmentQueue: Queue,
+    private readonly notifications: NotificationsService,
+    @InjectQueue(QUEUE_PUSH_NOTIFICATION) private readonly pushQueue: Queue,
   ) {}
 
   findAll({ limit = 100, page = 1 }: { limit?: number; page?: number } = {}) {
@@ -137,27 +141,131 @@ export class DenunciasService {
       include: DENUNCIA_LIST_INCLUDE,
     });
 
-    await this.assignmentQueue.add(
-      JOB_ASSIGN_COMPLAINT,
-      { denunciaId: denuncia.id } satisfies AssignComplaintJob,
-      {
-        attempts:         3,
-        backoff:          { type: 'exponential', delay: 3_000 },
-        removeOnComplete: true,
-      },
-    );
+    this.notifications.emitComplaintCreated(denuncia.id);
+    await this.notifyCitizenRegistered(denuncia);
 
     return mapDenunciaPublica(denuncia);
   }
 
   async update(id: string, dto: UpdateDenunciaDto) {
-    await this.findOne(id);
+    const before = await this.prisma.denuncia.findUnique({ where: { id } });
+    if (!before) throw new NotFoundException(`Denúncia #${id} não encontrada`);
+
     const updated = await this.prisma.denuncia.update({
       where: { id },
       data: dto,
       include: DENUNCIA_LIST_INCLUDE,
     });
+
+    if (dto.status && dto.status !== before.status) {
+      await this.notifyCitizenOnStatusChange(updated, dto.status);
+    }
+
     return mapDenunciaPublica({ ...updated, imagemBytes: null });
+  }
+
+  /** Cidadão: denúncia criada em aberto (sem passar automático para análise). */
+  private async notifyCitizenRegistered(denuncia: {
+    id: string;
+    titulo: string;
+    autorId: string;
+    criadoEm: Date;
+  }): Promise<void> {
+    const title = '📋 Denúncia registrada';
+    const body  =
+      `Sua denúncia "${denuncia.titulo}" foi registrada e aguarda análise da prefeitura.`;
+
+    this.notifications.emitComplaintUpdate(
+      denuncia.autorId,
+      denuncia.id,
+      'aberto',
+      denuncia.criadoEm,
+    );
+    this.notifications.emitNotification(
+      denuncia.autorId,
+      title,
+      body,
+      denuncia.id,
+    );
+
+    this.enqueuePush({
+      usuarioId: denuncia.autorId,
+      titulo:    title,
+      mensagem:  body,
+      url:       '/',
+    });
+  }
+
+  /** WebSocket + sino + push quando o status muda no painel municipal. */
+  private async notifyCitizenOnStatusChange(
+    denuncia: {
+      id: string;
+      titulo: string;
+      autorId: string;
+      status: StatusDenuncia;
+      atualizadoEm: Date;
+    },
+    status: StatusDenuncia,
+  ): Promise<void> {
+    this.notifications.emitComplaintUpdate(
+      denuncia.autorId,
+      denuncia.id,
+      status,
+      denuncia.atualizadoEm,
+    );
+
+    const messages: Partial<
+      Record<StatusDenuncia, { title: string; body: string }>
+    > = {
+      resolvido: {
+        title: '✅ Denúncia resolvida',
+        body:  `Sua denúncia "${denuncia.titulo}" foi concluída pela equipe municipal.`,
+      },
+      cancelado: {
+        title: 'Denúncia encerrada',
+        body:  `Sua denúncia "${denuncia.titulo}" foi encerrada.`,
+      },
+      analise: {
+        title: '📋 Denúncia em análise',
+        body:  `Sua denúncia "${denuncia.titulo}" está em análise.`,
+      },
+      aberto: {
+        title: 'Denúncia reaberta',
+        body:  `Sua denúncia "${denuncia.titulo}" voltou para a fila.`,
+      },
+    };
+
+    const msg = messages[status];
+    if (!msg) return;
+
+    this.notifications.emitNotification(
+      denuncia.autorId,
+      msg.title,
+      msg.body,
+      denuncia.id,
+    );
+
+    const pushPayload: SendPushJob = {
+      usuarioId: denuncia.autorId,
+      titulo:    msg.title,
+      mensagem:  msg.body,
+      url:       '/',
+    };
+
+    this.enqueuePush(pushPayload);
+  }
+
+  /** Push em background — não bloqueia a API (sino usa WebSocket imediato). */
+  private enqueuePush(payload: SendPushJob): void {
+    void this.pushQueue
+      .add(JOB_SEND_PUSH, payload, {
+        attempts:         3,
+        backoff:          { type: 'exponential', delay: 2_000 },
+        removeOnComplete: true,
+      })
+      .catch((err: Error) =>
+        this.logger.warn(`Push enfileirado falhou (Redis?): ${err.message}`),
+      );
   }
 
   async remove(id: string) {

@@ -1,10 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MdNotifications, MdNotificationsNone, MdClose, MdCircle } from 'react-icons/md';
 import { motion, AnimatePresence } from 'motion/react';
-import { useSocket } from '../hooks/useSocket';
-import type { AppNotification, NotificationNewPayload } from '../types';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+import { useNotifications } from '../context/NotificationContext';
 
 function timeAgo(date: Date): string {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -14,43 +11,26 @@ function timeAgo(date: Date): string {
   return `${Math.floor(diff / 86400)}d`;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 interface NotificationBellProps {
-  /** Classe extra para posicionamento no header */
   className?: string;
 }
 
 export function NotificationBell({ className = '' }: NotificationBellProps) {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [open, setOpen]     = useState(false);
-  const [shake, setShake]   = useState(false);
-  const dropdownRef         = useRef<HTMLDivElement>(null);
+  const { notifications, unreadCount, clearAll, markAllRead, remove } = useNotifications();
+  const [open, setOpen]   = useState(false);
+  const [shake, setShake] = useState(false);
+  const dropdownRef       = useRef<HTMLDivElement>(null);
+  const prevUnread        = useRef(unreadCount);
 
-  const { subscribe, unsubscribe } = useSocket();
-
-  // ── Escuta eventos do socket ────────────────────────────────────────────────
   useEffect(() => {
-    const handler = (payload: NotificationNewPayload) => {
-      const notification: AppNotification = {
-        id:         crypto.randomUUID(),
-        title:      payload.title,
-        body:       payload.body,
-        denunciaId: payload.denunciaId,
-        receivedAt: new Date(),
-        read:       false,
-      };
-
-      setNotifications(prev => [notification, ...prev].slice(0, 50)); // máx 50
+    if (unreadCount > prevUnread.current) {
       setShake(true);
-      setTimeout(() => setShake(false), 600);
-    };
+      const t = setTimeout(() => setShake(false), 600);
+      return () => clearTimeout(t);
+    }
+    prevUnread.current = unreadCount;
+  }, [unreadCount]);
 
-    subscribe<NotificationNewPayload>('notification:new', handler);
-    return () => unsubscribe<NotificationNewPayload>('notification:new', handler);
-  }, [subscribe, unsubscribe]);
-
-  // ── Fecha ao clicar fora ───────────────────────────────────────────────────
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -61,21 +41,13 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-
   const handleOpen = () => {
     setOpen(v => !v);
-    // Marca todas como lidas ao abrir
-    if (!open) {
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    }
+    if (!open) markAllRead();
   };
-
-  const clearAll = () => setNotifications([]);
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
-      {/* Botão sino */}
       <motion.button
         onClick={handleOpen}
         animate={shake ? { rotate: [0, -15, 15, -10, 10, -5, 5, 0] } : {}}
@@ -87,7 +59,6 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
           : <MdNotificationsNone className="w-5 h-5" />
         }
 
-        {/* Badge */}
         <AnimatePresence>
           {unreadCount > 0 && (
             <motion.span
@@ -103,7 +74,6 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
         </AnimatePresence>
       </motion.button>
 
-      {/* Dropdown */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -113,7 +83,6 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
             transition={{ duration: 0.15 }}
             className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[600] overflow-hidden"
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <h3 className="font-bold text-sm text-gray-900">Notificações</h3>
               {notifications.length > 0 && (
@@ -126,7 +95,6 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
               )}
             </div>
 
-            {/* Lista */}
             <div className="max-h-80 overflow-y-auto">
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2">
@@ -150,7 +118,7 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
                           <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.receivedAt)}</p>
                         </div>
                         <button
-                          onClick={() => setNotifications(prev => prev.filter(x => x.id !== n.id))}
+                          onClick={() => remove(n.id)}
                           className="p-0.5 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
                         >
                           <MdClose className="w-3.5 h-3.5 text-gray-400" />

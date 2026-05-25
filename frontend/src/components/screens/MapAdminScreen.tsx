@@ -6,6 +6,7 @@ import { ExportButton } from '../ExportButton';
 import { LeafletMap, MapMarker, type LeafletMapApi } from '../LeafletMap';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDenuncias } from '../../hooks/api/useDenuncias';
+import { useDenunciasLiveSync } from '../../hooks/useDenunciasLiveSync';
 
 // ── Cores por categoria ────────────────────────────────────────────────────────
 const CATEGORY_COLORS: Record<CategoryType, string> = {
@@ -29,6 +30,7 @@ export function MapAdminScreen() {
   const mapApiRef = useRef<LeafletMapApi | null>(null);
 
   const { complaints, isLoading } = useDenuncias();
+  useDenunciasLiveSync();
 
   const filteredReports = complaints.filter(report => {
     if (report.lat === undefined || report.lng === undefined) return false;

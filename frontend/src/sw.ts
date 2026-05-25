@@ -73,9 +73,9 @@ self.addEventListener('push', (event) => {
     icon?: string;
   } | undefined;
 
-  const title = data?.title ?? 'Denúncias Urbanas';
+  const title = data?.title ?? data?.titulo ?? 'Denúncias Urbanas';
   const options: NotificationOptions = {
-    body: data?.body ?? 'Você tem uma nova notificação.',
+    body: data?.body ?? data?.mensagem ?? 'Você tem uma nova notificação.',
     icon: data?.icon ?? '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     tag: data?.tag ?? 'denuncias-urbanas',
