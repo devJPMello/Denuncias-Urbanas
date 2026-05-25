@@ -1,15 +1,13 @@
 /**
- * Singleton Socket.io client.
- *
- * Mantém uma única conexão para toda a aplicação.
- * O token Clerk é passado em handshake.auth para que o backend possa
- * verificar a identidade e adicionar o socket à sala correta.
+ * Dois sockets independentes:
+ * - authSocket: cidadão logado (sino, notification:new)
+ * - municipalSocket: painel municipal aberto (lista em tempo real)
+ * Assim o painel não derruba a conexão do cidadão.
  */
 
 import { io, Socket } from 'socket.io-client';
 import { API_BASE_URL } from './api';
 
-/** Socket.io fica na raiz do servidor, não em /api. */
 function resolveSocketUrl(): string {
   if (API_BASE_URL.startsWith('http')) {
     return API_BASE_URL.replace(/\/api$/, '');
@@ -19,45 +17,77 @@ function resolveSocketUrl(): string {
 
 const SOCKET_URL = resolveSocketUrl();
 
-class SocketService {
+type Handler = (...args: unknown[]) => void;
+
+class ManagedSocket {
   private socket: Socket | null = null;
+  private readonly listeners = new Map<string, Set<Handler>>();
+  private readonly label: string;
 
-  /** Conecta ao servidor. Ignora se já estiver conectado com o mesmo token. */
-  connect(token: string): void {
-    if (this.socket?.connected) return;
+  constructor(label: string) {
+    this.label = label;
+  }
 
-    // Desconecta socket obsoleto antes de reconectar (ex: refresh de token)
+  private bindStoredListeners(): void {
+    if (!this.socket) return;
+    for (const [event, handlers] of this.listeners) {
+      for (const handler of handlers) {
+        this.socket.on(event, handler);
+      }
+    }
+  }
+
+  private createSocket(auth: Record<string, string>): void {
+    this.socket?.removeAllListeners();
     this.socket?.disconnect();
 
     this.socket = io(SOCKET_URL, {
-      auth:                { token },
-      transports:          ['websocket'],
-      reconnectionAttempts: 5,
-      reconnectionDelay:    2_000,
+      auth,
+      transports:           ['websocket'],
+      reconnectionAttempts: 10,
+      reconnectionDelay:    1_000,
     });
 
     this.socket.on('connect', () =>
-      console.info('[socket] conectado:', this.socket?.id),
+      console.info(`[${this.label}] conectado:`, this.socket?.id),
     );
     this.socket.on('disconnect', (reason) =>
-      console.info('[socket] desconectado:', reason),
+      console.info(`[${this.label}] desconectado:`, reason),
     );
     this.socket.on('connect_error', (err) =>
-      console.warn('[socket] erro de conexão:', err.message),
+      console.warn(`[${this.label}] erro:`, err.message),
     );
+
+    this.bindStoredListeners();
+  }
+
+  connectAuth(token: string): void {
+    if (this.socket?.connected) return;
+    this.createSocket({ token });
+  }
+
+  connectMunicipalPanel(): void {
+    if (this.socket?.connected) return;
+    this.createSocket({ mode: 'municipal-panel' });
   }
 
   disconnect(): void {
+    this.socket?.removeAllListeners();
     this.socket?.disconnect();
     this.socket = null;
   }
 
   on<T = unknown>(event: string, handler: (data: T) => void): void {
-    this.socket?.on(event, handler as (...args: unknown[]) => void);
+    const wrapped = handler as Handler;
+    if (!this.listeners.has(event)) this.listeners.set(event, new Set());
+    this.listeners.get(event)!.add(wrapped);
+    this.socket?.on(event, wrapped);
   }
 
   off<T = unknown>(event: string, handler: (data: T) => void): void {
-    this.socket?.off(event, handler as (...args: unknown[]) => void);
+    const wrapped = handler as Handler;
+    this.listeners.get(event)?.delete(wrapped);
+    this.socket?.off(event, wrapped);
   }
 
   get connected(): boolean {
@@ -65,4 +95,11 @@ class SocketService {
   }
 }
 
-export const socketService = new SocketService();
+/** Cidadão logado — notificações no sino. */
+export const authSocketService = new ManagedSocket('socket');
+
+/** Painel municipal — atualização da lista (sem login). */
+export const municipalSocketService = new ManagedSocket('socket:municipal');
+
+/** @deprecated use authSocketService — mantido para imports antigos */
+export const socketService = authSocketService;

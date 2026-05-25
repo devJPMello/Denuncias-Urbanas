@@ -8,6 +8,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Server, Socket } from 'socket.io';
 import { verifyToken } from '@clerk/backend';
+import { UsuariosService } from '../usuarios/usuarios.service';
 
 @WebSocketGateway({
   cors: {
@@ -21,10 +22,22 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
   private readonly logger = new Logger(NotificationsGateway.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly usuariosService: UsuariosService,
+  ) {}
 
   async handleConnection(client: Socket) {
     const token = client.handshake.auth?.token as string | undefined;
+    const mode  = client.handshake.auth?.mode as string | undefined;
+
+    // Painel municipal aberto (sem Clerk) — só recebe atualizações da lista
+    if (mode === 'municipal-panel') {
+      await client.join('municipal-panel');
+      client.data.mode = 'municipal-panel';
+      this.logger.debug(`Painel municipal conectado (socket ${client.id})`);
+      return;
+    }
 
     if (!token) {
       this.logger.warn(`Conexão recusada — token ausente (${client.id})`);
@@ -37,11 +50,16 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
         secretKey: this.config.getOrThrow<string>('CLERK_SECRET_KEY'),
       });
 
-      const userId = payload.sub;
-      await client.join(`user:${userId}`);
-      client.data.userId = userId;
+      const user = await this.usuariosService.findOrCreate({
+        clerkId: payload.sub,
+        nome:    (payload as { name?: string }).name  ?? 'Usuário',
+        email:   (payload as { email?: string }).email ?? `${payload.sub}@clerk.local`,
+      });
 
-      this.logger.debug(`Conectado: ${userId} (socket ${client.id})`);
+      await client.join(`user:${user.id}`);
+      client.data.userId = user.id;
+
+      this.logger.debug(`Conectado: ${user.id} (socket ${client.id})`);
     } catch {
       this.logger.warn(`Token inválido — conexão recusada (${client.id})`);
       client.disconnect();
