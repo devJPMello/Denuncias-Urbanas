@@ -17,10 +17,13 @@ export class DenunciasService {
     @InjectQueue(QUEUE_COMPLAINT_ASSIGNMENT) private readonly assignmentQueue: Queue,
   ) {}
 
-  findAll() {
+  /** Lista com paginação — padrão: 100 mais recentes, página 1. */
+  findAll({ limit = 100, page = 1 }: { limit?: number; page?: number } = {}) {
     return this.prisma.denuncia.findMany({
       include: { autor: { select: { id: true, nome: true, email: true } } },
       orderBy: { criadoEm: 'desc' },
+      take:    limit,
+      skip:    (page - 1) * limit,
     });
   }
 

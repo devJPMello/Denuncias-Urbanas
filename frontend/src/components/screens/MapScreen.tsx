@@ -9,6 +9,8 @@ import { Textarea } from '../Textarea';
 import { motion } from 'motion/react';
 import { useDenuncias } from '../../hooks/api/useDenuncias';
 import { useCreateDenuncia } from '../../hooks/api/useCreateDenuncia';
+import { useAuth } from '@clerk/clerk-react';
+import { CLERK_ENABLED } from '../../lib/auth';
 
 // ── Cores dos marcadores (matches theme.css) ──────────────────────────────────
 const CATEGORY_COLORS: Record<CategoryType, string> = {
@@ -16,10 +18,11 @@ const CATEGORY_COLORS: Record<CategoryType, string> = {
   lixo:       '#F59E0B',
   iluminacao: '#3B82F6',
   calcada:    '#F97316',
+  vandalismo: '#8B5CF6',
   outros:     '#6B7280',
 };
 
-const categories: CategoryType[] = ['buraco', 'lixo', 'iluminacao', 'calcada', 'outros'];
+const categories: CategoryType[] = ['buraco', 'lixo', 'iluminacao', 'calcada', 'vandalismo', 'outros'];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface MapScreenProps {
@@ -34,21 +37,28 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
   const [showNewReportModal, setShowNewReportModal] = useState(false);
   const [selectedCategory, setSelectedCategory]     = useState<CategoryType | null>(null);
   const [description, setDescription]               = useState('');
-  const [image, setImage]                           = useState<string | null>(null);
-  const [submitted, setSubmitted]                   = useState(false);
+
+  // Imagem: File para upload real + preview local
+  const [imageFile,    setImageFile]    = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading,  setIsUploading]  = useState(false);
+
+  const [submitted, setSubmitted] = useState(false);
 
   // ── Geolocalização ───────────────────────────────────────────────────────────
-  const [locAddress,   setLocAddress]   = useState<string | null>(null);
-  const [locCoords,    setLocCoords]    = useState<{ lat: number; lng: number } | null>(null);
-  const [locAccuracy,  setLocAccuracy]  = useState<number | null>(null);
-  const [locLoading,   setLocLoading]   = useState(false);
-  const [locError,     setLocError]     = useState<string | null>(null);
-  const mapContainerRef   = useRef<HTMLElement & { _leafletLocate?: () => void } | null>(null);
-  const fileInputRef      = useRef<HTMLInputElement>(null);   // galeria / pasta
-  const cameraInputRef    = useRef<HTMLInputElement>(null);   // câmera
+  const [locAddress,  setLocAddress]  = useState<string | null>(null);
+  const [locCoords,   setLocCoords]   = useState<{ lat: number; lng: number } | null>(null);
+  const [locAccuracy, setLocAccuracy] = useState<number | null>(null);
+  const [locLoading,  setLocLoading]  = useState(false);
+  const [locError,    setLocError]    = useState<string | null>(null);
 
-  const { complaints, isLoading, refetch } = useDenuncias();
-  const { create, isLoading: isCreating }  = useCreateDenuncia();
+  const mapContainerRef = useRef<HTMLElement & { _leafletLocate?: () => void } | null>(null);
+  const fileInputRef    = useRef<HTMLInputElement>(null);   // galeria / pasta
+  const cameraInputRef  = useRef<HTMLInputElement>(null);   // câmera
+
+  const { complaints, isLoading } = useDenuncias();
+  const { create, isLoading: isCreating } = useCreateDenuncia();
+  const { getToken } = useAuth();
 
   const filteredReports = complaints.filter(r =>
     !searchQuery || r.address.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -124,44 +134,85 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
     );
   };
 
-
-const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setImage(url);
+    // Revogar URL anterior se existir
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
     e.target.value = '';
+  };
+
+  const removeImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(null);
+  };
+
+  /** Faz upload do arquivo e retorna a URL do servidor. */
+  const uploadImage = async (file: File): Promise<string | undefined> => {
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const token = CLERK_ENABLED ? await getToken() : null;
+      const headers: Record<string, string> = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`Upload falhou: HTTP ${res.status}`);
+      const { url } = await res.json() as { url: string };
+      return url;
+    } catch (err) {
+      console.error('Erro no upload:', err);
+      return undefined;
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleSubmit = async () => {
     if (!selectedCategory) return;
 
     try {
+      // Faz upload da imagem antes de criar a denúncia
+      let imagemUrl: string | undefined;
+      if (imageFile) {
+        imagemUrl = await uploadImage(imageFile);
+      }
+
       await create({
         titulo:    `${selectedCategory} — denúncia`,
         descricao: description || 'Sem descrição',
         categoria: selectedCategory as any,
         endereco:  locAddress ?? 'Endereço não informado',
-        imagemUrl: image ?? undefined,
+        imagemUrl,
         lat:       locCoords?.lat,
         lng:       locCoords?.lng,
       });
+
       setSubmitted(true);
-      refetch();
       setTimeout(() => {
         setShowNewReportModal(false);
         setSubmitted(false);
         setSelectedCategory(null);
         setDescription('');
-        if (image) URL.revokeObjectURL(image);
-        setImage(null);
+        removeImage();
         setLocAddress(null);
         setLocCoords(null);
         setLocAccuracy(null);
         setLocError(null);
       }, 2000);
     } catch {
-      // error handled by hook
+      // erro tratado pelo hook (TanStack Query)
     }
   };
 
@@ -302,30 +353,17 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Foto */}
             <div>
               <label className="block font-semibold mb-3 text-gray-900">Foto do problema</label>
-              {/* Inputs ocultos */}
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+              <input ref={fileInputRef}   type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
 
-              {image ? (
+              {imagePreview ? (
                 <div className="relative border-2 border-gray-200 rounded-2xl overflow-hidden">
-                  <img src={image} alt="Upload" className="w-full h-56 object-cover" />
+                  <img src={imagePreview} alt="Upload" className="w-full h-56 object-cover" />
                   <button
-                    onClick={() => { URL.revokeObjectURL(image!); setImage(null); }}
+                    onClick={removeImage}
                     className="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors"
                   >
                     <MdClose className="w-5 h-5" />
@@ -358,6 +396,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
               )}
             </div>
 
+            {/* Categoria */}
             <div>
               <label className="block font-semibold mb-3 text-gray-900">Categoria</label>
               <div className="grid grid-cols-3 gap-3">
@@ -408,15 +447,9 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                       placeholder="Digite o endereço do problema..."
                       className="w-full text-xs text-gray-800 bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      Edite se o endereço estiver incorreto
-                    </p>
+                    <p className="text-[10px] text-gray-400 mt-1">Edite se o endereço estiver incorreto</p>
                   </div>
-                  <button
-                    onClick={detectLocation}
-                    title="Atualizar localização"
-                    className="p-1.5 hover:bg-blue-200 rounded-lg transition-colors flex-shrink-0"
-                  >
+                  <button onClick={detectLocation} title="Atualizar localização" className="p-1.5 hover:bg-blue-200 rounded-lg transition-colors flex-shrink-0">
                     <MdRefresh className="w-4 h-4 text-primary" />
                   </button>
                 </div>
@@ -445,12 +478,9 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                   </div>
                 </button>
 
-                {/* Se GPS falhou, mostra campo manual */}
                 {locError && (
                   <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3">
-                    <p className="text-xs font-semibold text-gray-700 mb-1.5">
-                      Digite o endereço manualmente
-                    </p>
+                    <p className="text-xs font-semibold text-gray-700 mb-1.5">Digite o endereço manualmente</p>
                     <input
                       type="text"
                       value={locAddress ?? ''}
@@ -467,9 +497,9 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
               size="lg"
               className="w-full"
               onClick={handleSubmit}
-              disabled={!selectedCategory || !image || !locAddress || isCreating}
+              disabled={!selectedCategory || !imageFile || !locAddress || isCreating || isUploading}
             >
-              {isCreating ? 'Enviando...' : 'Enviar Denúncia'}
+              {isUploading ? 'Enviando foto...' : isCreating ? 'Enviando...' : 'Enviar Denúncia'}
             </Button>
           </div>
         )}

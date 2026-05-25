@@ -1,6 +1,6 @@
-import { MdWarning, MdDelete, MdLightbulb, MdDirectionsWalk, MdMoreHoriz } from 'react-icons/md';
+import { MdWarning, MdDelete, MdLightbulb, MdDirectionsWalk, MdMoreHoriz, MdBrokenImage } from 'react-icons/md';
 
-export type CategoryType = 'buraco' | 'lixo' | 'iluminacao' | 'calcada' | 'outros';
+export type CategoryType = 'buraco' | 'lixo' | 'iluminacao' | 'calcada' | 'vandalismo' | 'outros';
 
 interface CategoryChipProps {
   category: CategoryType;
@@ -32,6 +32,12 @@ const categoryConfig = {
     label: 'Calçada',
     color: 'var(--category-calcada)',
     gradient: 'from-orange-500 to-orange-600'
+  },
+  vandalismo: {
+    icon: MdBrokenImage,
+    label: 'Vandalismo',
+    color: 'var(--category-vandalismo)',
+    gradient: 'from-violet-500 to-purple-600'
   },
   outros: {
     icon: MdMoreHoriz,

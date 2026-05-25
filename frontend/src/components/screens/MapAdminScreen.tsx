@@ -13,6 +13,7 @@ const CATEGORY_COLORS: Record<CategoryType, string> = {
   lixo:       '#F59E0B',
   iluminacao: '#3B82F6',
   calcada:    '#F97316',
+  vandalismo: '#8B5CF6',
   outros:     '#6B7280',
 };
 

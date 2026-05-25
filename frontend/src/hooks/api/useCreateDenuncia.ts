@@ -1,10 +1,12 @@
 /**
- * useCreateDenuncia — envia o formulário de nova denúncia para o backend.
+ * useCreateDenuncia — envia nova denúncia via TanStack Query mutation.
+ * Invalida automaticamente os caches de denúncias após criação.
  */
-import { useState, useCallback } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-react';
 import { api } from '../../services/api';
 import { ApiDenuncia, Complaint, CreateDenunciaPayload, mapApiDenuncia } from '../../types';
+import { CLERK_ENABLED } from '../../lib/auth';
 
 interface UseCreateDenunciaResult {
   create:    (payload: CreateDenunciaPayload) => Promise<Complaint>;
@@ -14,24 +16,23 @@ interface UseCreateDenunciaResult {
 
 export function useCreateDenuncia(): UseCreateDenunciaResult {
   const { getToken } = useAuth();
-  const [isLoading, setLoading] = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const queryClient  = useQueryClient();
 
-  const create = useCallback(async (payload: CreateDenunciaPayload): Promise<Complaint> => {
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await getToken();
-      const data  = await api.post<ApiDenuncia>('/denuncias', payload, token);
-      return mapApiDenuncia(data);
-    } catch (err) {
-      const msg = String(err);
-      setError(msg);
-      throw new Error(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [getToken]);
+  const { mutateAsync, isPending, error } = useMutation<ApiDenuncia, Error, CreateDenunciaPayload>({
+    mutationFn: async (payload) => {
+      const token = CLERK_ENABLED ? await getToken() : null;
+      return api.post<ApiDenuncia>('/denuncias', payload, token);
+    },
+    onSuccess: () => {
+      // Invalida listas → próximo acesso vai buscar do servidor
+      queryClient.invalidateQueries({ queryKey: ['denuncias'] });
+      queryClient.invalidateQueries({ queryKey: ['my-denuncias'] });
+    },
+  });
 
-  return { create, isLoading, error };
+  return {
+    create:    async (payload) => mapApiDenuncia(await mutateAsync(payload)),
+    isLoading: isPending,
+    error:     error ? String(error) : null,
+  };
 }

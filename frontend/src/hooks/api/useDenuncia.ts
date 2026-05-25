@@ -1,7 +1,7 @@
 /**
- * useDenuncia — busca uma denúncia pelo id (detalhe).
+ * useDenuncia — busca uma denúncia pelo id (detalhe) via TanStack Query.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { ApiDenuncia, Complaint, mapApiDenuncia } from '../../types';
 
@@ -14,37 +14,19 @@ interface UseDenunciaResult {
 }
 
 export function useDenuncia(id: string | null): UseDenunciaResult {
-  const [raw, setRaw]           = useState<ApiDenuncia | null>(null);
-  const [isLoading, setLoading] = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const [tick, setTick]         = useState(0);
-
-  const refetch = useCallback(() => setTick(t => t + 1), []);
-
-  useEffect(() => {
-    if (!id) {
-      setRaw(null);
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    setLoading(true);
-    setError(null);
-
-    api.get<ApiDenuncia>(`/denuncias/${id}`)
-      .then(data => { if (!cancelled) { setRaw(data); setLoading(false); } })
-      .catch(err  => { if (!cancelled) { setError(String(err)); setLoading(false); } });
-
-    return () => { cancelled = true; };
-  }, [id, tick]);
+  const { data, isLoading, error, refetch } = useQuery<ApiDenuncia>({
+    queryKey: ['denuncias', id],
+    queryFn:  () => api.get<ApiDenuncia>(`/denuncias/${id}`),
+    enabled:  !!id,
+    staleTime: 30_000,
+    retry: 1,
+  });
 
   return {
-    complaint: raw ? mapApiDenuncia(raw) : null,
-    raw,
+    complaint: data ? mapApiDenuncia(data) : null,
+    raw:       data ?? null,
     isLoading,
-    error,
+    error:     error ? String(error) : null,
     refetch,
   };
 }
