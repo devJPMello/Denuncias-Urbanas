@@ -11,13 +11,14 @@ import { Modal } from '../Modal';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapAdminScreen } from './MapAdminScreen';
 import { ReportsScreen } from './ReportsScreen';
+import type { AdminView } from '../admin/AdminBottomNav';
+import { AdminCallCard } from '../admin/AdminCallCard';
 import { useDenuncias } from '../../hooks/api/useDenuncias';
 import { useDenunciasLiveSync } from '../../hooks/useDenunciasLiveSync';
 import { useUpdateDenuncia } from '../../hooks/api/useUpdateDenuncia';
 import type { Complaint } from '../../types';
 import type { ApiStatus } from '../../types';
 
-type AdminView = 'map' | 'calls' | 'reports';
 const statusLabels = { open: 'Aberto', analysis: 'Em Análise', resolved: 'Resolvido' };
 
 // ── Status maps for the action dropdown ──────────────────────────────────────
@@ -151,24 +152,25 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
   return (
     <div className="h-full flex bg-gray-50 overflow-hidden">
 
-      {/* Mobile overlay */}
+      {/* Overlay mobile — fecha sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
-            key="overlay"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            key="sidebar-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[500] md:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
+      {/* ── Sidebar ───────────────────────────────────────────────────────────── */}
       <aside className={`
-        relative bg-white border-r border-border flex flex-col transition-all duration-300
-        fixed inset-y-0 left-0 z-40 w-56
+        fixed inset-y-0 left-0 z-[510] w-[min(16rem,50vw)] max-w-[50%] bg-white border-r border-border flex flex-col transition-all duration-300 shadow-xl
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:relative md:inset-auto md:z-auto md:translate-x-0
+        md:relative md:inset-auto md:translate-x-0 md:flex
         ${sidebarOpen ? 'md:w-56' : 'md:w-14'}
       `}>
         {/* Botão flutuante de toggle */}
@@ -193,8 +195,13 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
               <p className="text-[11px] text-muted-foreground">Municipal</p>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="md:hidden ml-2 p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
-            <MdClose className="w-4 h-4 text-gray-500" />
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden ml-2 p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+            aria-label="Fechar menu"
+          >
+            <MdClose className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
@@ -207,7 +214,12 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
           ].map((item) => (
             <button
               key={item.label}
-              onClick={() => { setCurrentView(item.view); if (window.innerWidth < 768) setSidebarOpen(false); }}
+              onClick={() => {
+                setCurrentView(item.view);
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  setSidebarOpen(false);
+                }
+              }}
               className={`w-full flex items-center rounded-lg text-sm transition-all font-semibold py-2.5
                 ${sidebarOpen ? 'gap-3 px-3' : 'justify-center px-2'}
                 ${currentView === item.view
@@ -270,28 +282,18 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
       </aside>
 
       {/* ── Main content ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {currentView !== 'reports' && (
-          <header className="bg-white border-b border-border">
-            <div className="px-4 py-3 flex items-center gap-3 min-w-0">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-              >
-                <MdMenu className="w-5 h-5 text-gray-600" />
-              </button>
-              <div className="min-w-0">
-                <h2 className="font-bold truncate text-gray-900">
-                  {currentView === 'map' ? 'Mapa de Ocorrências' : 'Fila de Chamados'}
-                </h2>
-                <p className="text-gray-500 text-xs truncate">
-                  {currentView === 'map'
-                    ? 'Visualização geográfica'
-                    : isLoading ? 'Carregando...' : `${filteredReports.length} chamado(s)`}
-                </p>
-              </div>
-            </div>
-          </header>
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 relative">
+        {/* Hambúrguer — mobile (some quando a sidebar está aberta) */}
+        {!sidebarOpen && (
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden fixed z-[520] left-3 p-3 bg-white rounded-xl shadow-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+            style={{ top: 'calc(0.75rem + env(safe-area-inset-top, 0px))' }}
+            aria-label="Abrir menu"
+          >
+            <MdMenu className="w-6 h-6" />
+          </button>
         )}
 
         {currentView === 'map' ? (
@@ -299,7 +301,13 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
         ) : currentView === 'reports' ? (
           <ReportsScreen />
         ) : (
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-3 md:p-4 pt-16 md:pt-4 space-y-3">
+            <div className="md:hidden mb-1">
+              <h2 className="text-lg font-bold text-gray-900">Fila de Chamados</h2>
+              <p className="text-xs text-gray-500">
+                {isLoading ? 'Carregando...' : `${filteredReports.length} chamado(s)`}
+              </p>
+            </div>
 
             {/* Stat cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -329,7 +337,7 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
 
             {/* Filters */}
             <div className="bg-white rounded-xl shadow-sm border border-border p-3">
-              <div className="flex flex-col md:flex-row gap-2">
+              <div className="flex flex-col gap-2 md:flex-row">
                 <div className="relative flex-1">
                   <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -365,13 +373,37 @@ export function AdminPanelScreen({ onLogout }: AdminPanelScreenProps) {
               </div>
             </div>
 
-            {/* Table */}
+            {isLoading && (
+              <div className="md:hidden flex justify-center py-12">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+
+            {/* Lista mobile */}
+            {!isLoading && (
+              <div className="md:hidden space-y-2.5">
+                {filteredReports.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-10">Nenhum chamado encontrado</p>
+                ) : (
+                  filteredReports.map((report) => (
+                    <AdminCallCard
+                      key={report.id}
+                      report={report}
+                      onOpen={() => handleRowClick(report)}
+                      onStatusChange={(s) => handleStatusChange(report.id, s)}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Tabela desktop */}
             {isLoading ? (
               <SkeletonTable rows={8} />
             ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="hidden md:block bg-white rounded-xl shadow-sm border border-border overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px]">
+                  <table className="w-full">
                     <thead className="bg-gray-50 border-b border-border">
                       <tr>
                         {['ID', 'Categoria', 'Endereço', 'Data', 'Status', 'Ação'].map(h => (
