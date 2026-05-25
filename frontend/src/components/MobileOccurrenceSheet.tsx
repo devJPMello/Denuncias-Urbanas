@@ -1,14 +1,8 @@
 import { MdClose, MdSearch } from 'react-icons/md';
 import { motion, AnimatePresence } from 'motion/react';
 import { CategoryType, categoryConfig } from './CategoryChip';
-import { Badge } from './Badge';
+import { ReportOccurrenceDetail } from './ReportOccurrenceDetail';
 import type { Complaint } from '../types';
-
-const STATUS_LABELS = {
-  open:     'Aberto',
-  analysis: 'Em análise',
-  resolved: 'Resolvido',
-} as const;
 
 export type MobileSheetMode = 'closed' | 'list' | 'detail';
 
@@ -119,10 +113,9 @@ export function MobileOccurrenceSheet({
 
               <div className="flex-1 overflow-y-auto min-h-0">
                 {mode === 'detail' && selected ? (
-                  <OccurrenceDetail
-                    report={selected}
-                    categoryColors={categoryColors}
-                  />
+                  <div className="p-4 pb-8">
+                    <ReportOccurrenceDetail report={selected} />
+                  </div>
                 ) : (
                   <OccurrenceList
                     reports={reports}
@@ -183,56 +176,6 @@ function OccurrenceList({
           <span className="text-[11px] text-gray-400">{report.date}</span>
         </button>
       ))}
-    </div>
-  );
-}
-
-function OccurrenceDetail({
-  report,
-  categoryColors,
-}: {
-  report:         Complaint;
-  categoryColors: Record<CategoryType, string>;
-}) {
-  const config = categoryConfig[report.category];
-  const Icon = config.icon;
-
-  return (
-    <div className="p-4 pb-8 space-y-4">
-      <div className="flex items-start gap-3">
-        <div className={`p-3 rounded-xl bg-gradient-to-br ${config.gradient} shadow-md flex-shrink-0`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 leading-snug">
-            {report.title ?? config.label}
-          </p>
-          <p className="text-sm text-gray-600 mt-1">{report.address}</p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge status={report.status}>{STATUS_LABELS[report.status]}</Badge>
-        <span className="text-xs text-gray-500">{report.date}</span>
-        <span
-          className="text-xs font-medium px-2 py-0.5 rounded-full capitalize"
-          style={{ background: `${categoryColors[report.category]}22`, color: categoryColors[report.category] }}
-        >
-          {config.label}
-        </span>
-      </div>
-
-      {report.description && (
-        <p className="text-sm text-gray-600 leading-relaxed">{report.description}</p>
-      )}
-
-      {report.image && (
-        <img
-          src={report.image}
-          alt="Foto da ocorrência"
-          className="w-full max-h-40 object-cover rounded-xl border border-gray-100"
-        />
-      )}
     </div>
   );
 }

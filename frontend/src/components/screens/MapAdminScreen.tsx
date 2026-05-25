@@ -6,6 +6,7 @@ import {
 } from 'react-icons/md';
 import { CategoryType, categoryConfig } from '../CategoryChip';
 import { Badge } from '../Badge';
+import { ReportOccurrenceDetail } from '../ReportOccurrenceDetail';
 import { ExportButton } from '../ExportButton';
 import { LeafletMap, MapMarker, type LeafletMapApi } from '../LeafletMap';
 import { motion, AnimatePresence } from 'motion/react';
@@ -294,7 +295,7 @@ export function MapAdminScreen() {
                     >
                       ← Voltar à lista
                     </button>
-                    <ReportDetailCard report={activeReport} />
+                    <ReportOccurrenceDetail report={activeReport} />
                   </div>
                 ) : (
                   <ReportList
@@ -388,7 +389,7 @@ function ReportList({
                 <Icon className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <Badge status={report.status} className="!w-auto !px-2 !text-[10px] mb-1">
+                <Badge status={report.status} className="mb-1">
                   {statusLabels[report.status]}
                 </Badge>
                 <p className="text-sm font-semibold text-gray-900 line-clamp-2">{report.address}</p>
@@ -401,35 +402,6 @@ function ReportList({
       })}
       {reports.length === 0 && (
         <p className="text-sm text-gray-400 text-center py-8">Nenhuma ocorrência no mapa</p>
-      )}
-    </div>
-  );
-}
-
-function ReportDetailCard({ report }: { report: Complaint }) {
-  const config = categoryConfig[report.category];
-  const Icon = config.icon;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-start gap-3">
-        <div className={`p-3 rounded-xl bg-gradient-to-br ${config.gradient}`}>
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <p className="font-semibold text-gray-900">{config.label}</p>
-          <p className="text-sm text-gray-600 mt-1">{report.address}</p>
-        </div>
-      </div>
-      <Badge status={report.status} className="!w-auto">
-        {statusLabels[report.status]}
-      </Badge>
-      <p className="text-xs text-gray-500">{report.date}</p>
-      {report.description && (
-        <p className="text-sm text-gray-600">{report.description}</p>
-      )}
-      {report.image && (
-        <img src={report.image} alt="" className="w-full max-h-36 object-cover rounded-xl border" />
       )}
     </div>
   );

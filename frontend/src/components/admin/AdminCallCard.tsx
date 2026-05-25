@@ -1,13 +1,8 @@
 import { categoryConfig } from '../CategoryChip';
+import { Badge } from '../Badge';
 import type { Complaint } from '../../types';
 
 const STATUS_LABELS = { open: 'Aberto', analysis: 'Em análise', resolved: 'Resolvido' } as const;
-
-const STATUS_STYLES = {
-  open:     'bg-amber-100 text-amber-800',
-  analysis: 'bg-blue-100 text-blue-800',
-  resolved: 'bg-green-100 text-green-800',
-} as const;
 
 interface AdminCallCardProps {
   report:         Complaint;
@@ -35,9 +30,7 @@ export function AdminCallCard({ report, onOpen, onStatusChange }: AdminCallCardP
             </p>
             <p className="text-xs text-gray-500 capitalize mt-0.5">{config.label}</p>
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLES[report.status]}`}>
-                {STATUS_LABELS[report.status]}
-              </span>
+              <Badge status={report.status}>{STATUS_LABELS[report.status]}</Badge>
               <span className="text-[10px] text-gray-400">{report.date}</span>
               <span className="text-[10px] text-gray-400 font-mono">#{report.id.slice(0, 8)}</span>
             </div>

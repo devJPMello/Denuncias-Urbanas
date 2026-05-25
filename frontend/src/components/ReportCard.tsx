@@ -47,7 +47,7 @@ export function ReportCard({ category, image, address, date, status, onClick }: 
             <Icon className="w-4 h-4 text-white flex-shrink-0" />
             <span className="text-white text-xs font-semibold">{config.label}</span>
           </div>
-          <Badge status={status} className="!w-auto px-2.5 py-1 text-xs shadow-md">
+          <Badge status={status} className="shadow-md">
             {statusLabels[status]}
           </Badge>
         </div>

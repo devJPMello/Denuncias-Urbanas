@@ -96,7 +96,7 @@ export function ReportDetailScreen({ reportId, onBack }: ReportDetailScreenProps
             <Icon className="w-4 h-4 text-white" />
             <span className="text-white text-sm font-semibold">{config.label}</span>
           </div>
-          <Badge status={currentStatus} className="!w-auto px-3 shadow-md">
+          <Badge status={currentStatus} className="shadow-md">
             {statusLabels[currentStatus]}
           </Badge>
 
