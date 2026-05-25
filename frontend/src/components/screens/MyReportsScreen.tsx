@@ -16,7 +16,7 @@ interface MyReportsScreenProps {
 export function MyReportsScreen({ onBack, onReportClick }: MyReportsScreenProps) {
   const [filter, setFilter] = useState<'all' | 'open' | 'analysis' | 'resolved'>('all');
 
-  const { complaints, isLoading, error, refetch } = useMyDenuncias();
+  const { complaints, isLoading } = useMyDenuncias();
 
   const filteredReports =
     filter === 'all' ? complaints : complaints.filter(r => r.status === filter);
@@ -83,17 +83,7 @@ export function MyReportsScreen({ onBack, onReportClick }: MyReportsScreenProps)
           transition={{ duration: 0.18 }}
           className="flex-1 overflow-y-auto p-4"
         >
-          {error ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
-              <p className="text-sm text-red-500 text-center">{error}</p>
-              <button
-                onClick={refetch}
-                className="px-4 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                Tentar novamente
-              </button>
-            </div>
-          ) : isLoading ? (
+          {isLoading ? (
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
             </div>

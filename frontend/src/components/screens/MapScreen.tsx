@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { MdSearch, MdAdd, MdList, MdPerson, MdFilterList, MdCamera, MdLocationOn, MdClose, MdMyLocation } from 'react-icons/md';
+import { MdSearch, MdAdd, MdList, MdPerson, MdFilterList, MdCamera, MdLocationOn, MdClose, MdMyLocation, MdPhoto, MdRefresh, MdGpsFixed } from 'react-icons/md';
 import { NotificationBell } from '../NotificationBell';
 import { CategoryType, CategoryChip } from '../CategoryChip';
 import { LeafletMap, MapMarker } from '../LeafletMap';
@@ -36,7 +36,16 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
   const [description, setDescription]               = useState('');
   const [image, setImage]                           = useState<string | null>(null);
   const [submitted, setSubmitted]                   = useState(false);
-  const mapContainerRef = useRef<HTMLElement & { _leafletLocate?: () => void } | null>(null);
+
+  // ── Geolocalização ───────────────────────────────────────────────────────────
+  const [locAddress,   setLocAddress]   = useState<string | null>(null);
+  const [locCoords,    setLocCoords]    = useState<{ lat: number; lng: number } | null>(null);
+  const [locAccuracy,  setLocAccuracy]  = useState<number | null>(null);
+  const [locLoading,   setLocLoading]   = useState(false);
+  const [locError,     setLocError]     = useState<string | null>(null);
+  const mapContainerRef   = useRef<HTMLElement & { _leafletLocate?: () => void } | null>(null);
+  const fileInputRef      = useRef<HTMLInputElement>(null);   // galeria / pasta
+  const cameraInputRef    = useRef<HTMLInputElement>(null);   // câmera
 
   const { complaints, isLoading, refetch } = useDenuncias();
   const { create, isLoading: isCreating }  = useCreateDenuncia();
@@ -63,8 +72,65 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
     (mapContainerRef.current as any)?._leafletLocate?.();
   };
 
-  const handleImageUpload = () => {
-    setImage('https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=400');
+  // Converte lat/lng em endereço legível via Nominatim
+  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+    try {
+      const res  = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=pt-BR`,
+      );
+      const data = await res.json();
+      return data.display_name as string;
+    } catch {
+      return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+  };
+
+  const applyPosition = async (coords: GeolocationCoordinates) => {
+    const { latitude: lat, longitude: lng, accuracy } = coords;
+    setLocCoords({ lat, lng });
+    setLocAccuracy(Math.round(accuracy));
+    const addr = await reverseGeocode(lat, lng);
+    setLocAddress(addr);
+    setLocLoading(false);
+  };
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      setLocError('Geolocalização não suportada neste dispositivo.');
+      return;
+    }
+    setLocLoading(true);
+    setLocError(null);
+
+    // 1ª tentativa: alta precisão (GPS) — ideal para celular ao ar livre
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => applyPosition(coords),
+      () => {
+        // 2ª tentativa: baixa precisão (WiFi/IP) — funciona em desktop e indoor
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => applyPosition(coords),
+          (err) => {
+            setLocLoading(false);
+            if (err.code === 1) {
+              setLocError('Permissão negada. Libere a localização nas configurações do navegador.');
+            } else {
+              setLocError('Não foi possível detectar sua localização. Digite o endereço manualmente.');
+            }
+          },
+          { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
+        );
+      },
+      { enableHighAccuracy: true, timeout: 8_000, maximumAge: 0 },
+    );
+  };
+
+
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setImage(url);
+    e.target.value = '';
   };
 
   const handleSubmit = async () => {
@@ -75,8 +141,10 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
         titulo:    `${selectedCategory} — denúncia`,
         descricao: description || 'Sem descrição',
         categoria: selectedCategory as any,
-        endereco:  'Quadra 104 Norte, Palmas, TO',  // TODO: usar geocoder real
+        endereco:  locAddress ?? 'Endereço não informado',
         imagemUrl: image ?? undefined,
+        lat:       locCoords?.lat,
+        lng:       locCoords?.lng,
       });
       setSubmitted(true);
       refetch();
@@ -85,7 +153,12 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
         setSubmitted(false);
         setSelectedCategory(null);
         setDescription('');
+        if (image) URL.revokeObjectURL(image);
         setImage(null);
+        setLocAddress(null);
+        setLocCoords(null);
+        setLocAccuracy(null);
+        setLocError(null);
       }, 2000);
     } catch {
       // error handled by hook
@@ -231,29 +304,58 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
           <div className="space-y-6">
             <div>
               <label className="block font-semibold mb-3 text-gray-900">Foto do problema</label>
-              <div
-                onClick={handleImageUpload}
-                className="border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden cursor-pointer hover:border-primary transition-colors group"
-              >
-                {image ? (
-                  <div className="relative">
-                    <img src={image} alt="Upload" className="w-full h-56 object-cover" />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setImage(null); }}
-                      className="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors"
-                    >
-                      <MdClose className="w-5 h-5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="h-56 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-gray-50 to-gray-100 group-hover:from-primary/5 group-hover:to-primary/10 transition-colors">
-                    <div className="p-4 bg-white rounded-2xl shadow-md group-hover:shadow-lg transition-shadow">
-                      <MdCamera className="w-10 h-10 text-gray-400 group-hover:text-primary transition-colors" />
+              {/* Inputs ocultos */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
+              {image ? (
+                <div className="relative border-2 border-gray-200 rounded-2xl overflow-hidden">
+                  <img src={image} alt="Upload" className="w-full h-56 object-cover" />
+                  <button
+                    onClick={() => { URL.revokeObjectURL(image!); setImage(null); }}
+                    className="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors"
+                  >
+                    <MdClose className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex flex-col items-center justify-center gap-2 h-32 border-2 border-dashed border-gray-300 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 hover:border-primary hover:from-primary/5 hover:to-primary/10 transition-all group"
+                  >
+                    <div className="p-3 bg-white rounded-xl shadow-md group-hover:shadow-lg transition-shadow">
+                      <MdCamera className="w-7 h-7 text-gray-400 group-hover:text-primary transition-colors" />
                     </div>
-                    <span className="font-medium text-gray-600 group-hover:text-primary transition-colors">Adicionar foto</span>
-                  </div>
-                )}
-              </div>
+                    <span className="text-xs font-medium text-gray-600 group-hover:text-primary transition-colors">Câmera</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex flex-col items-center justify-center gap-2 h-32 border-2 border-dashed border-gray-300 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 hover:border-primary hover:from-primary/5 hover:to-primary/10 transition-all group"
+                  >
+                    <div className="p-3 bg-white rounded-xl shadow-md group-hover:shadow-lg transition-shadow">
+                      <MdPhoto className="w-7 h-7 text-gray-400 group-hover:text-primary transition-colors" />
+                    </div>
+                    <span className="text-xs font-medium text-gray-600 group-hover:text-primary transition-colors">Galeria / Pasta</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
@@ -277,19 +379,95 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
               onChange={(e) => setDescription(e.target.value)}
             />
 
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-4 flex items-start gap-3 border border-blue-100">
-              <MdLocationOn className="w-6 h-6 text-primary flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-gray-900">Localização detectada</p>
-                <p className="text-sm text-gray-600 mt-1">Quadra 104 Norte, Palmas, TO</p>
+            {/* Localização */}
+            {locCoords ? (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-3 border border-blue-100">
+                <div className="flex items-start gap-3">
+                  <MdGpsFixed className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <p className="font-semibold text-gray-900 text-sm">Localização</p>
+                      {locAccuracy !== null && (() => {
+                        const good = locAccuracy <= 20;
+                        const ok   = locAccuracy <= 100;
+                        return (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            good ? 'bg-green-100 text-green-700'
+                                 : ok ? 'bg-yellow-100 text-yellow-700'
+                                      : 'bg-red-100 text-red-600'
+                          }`}>
+                            {good ? '✓ Alta precisão' : ok ? '⚠ Precisão média' : '✗ Baixa precisão'} · ~{locAccuracy}m
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <input
+                      type="text"
+                      value={locAddress ?? ''}
+                      onChange={(e) => setLocAddress(e.target.value)}
+                      placeholder="Digite o endereço do problema..."
+                      className="w-full text-xs text-gray-800 bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Edite se o endereço estiver incorreto
+                    </p>
+                  </div>
+                  <button
+                    onClick={detectLocation}
+                    title="Atualizar localização"
+                    className="p-1.5 hover:bg-blue-200 rounded-lg transition-colors flex-shrink-0"
+                  >
+                    <MdRefresh className="w-4 h-4 text-primary" />
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={detectLocation}
+                  disabled={locLoading}
+                  className="w-full flex items-center gap-3 p-4 border-2 border-dashed border-gray-300 rounded-2xl hover:border-primary hover:bg-primary/5 transition-all disabled:opacity-60"
+                >
+                  {locLoading ? (
+                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  ) : (
+                    <MdLocationOn className="w-6 h-6 text-gray-400 flex-shrink-0" />
+                  )}
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-gray-700">
+                      {locLoading ? 'Obtendo localização...' : 'Usar minha localização atual'}
+                    </p>
+                    {!locLoading && !locError && (
+                      <p className="text-xs text-gray-400 mt-0.5">Toque para detectar automaticamente</p>
+                    )}
+                    {locError && <p className="text-xs text-red-500 mt-0.5">{locError}</p>}
+                  </div>
+                </button>
+
+                {/* Se GPS falhou, mostra campo manual */}
+                {locError && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3">
+                    <p className="text-xs font-semibold text-gray-700 mb-1.5">
+                      Digite o endereço manualmente
+                    </p>
+                    <input
+                      type="text"
+                      value={locAddress ?? ''}
+                      onChange={(e) => setLocAddress(e.target.value)}
+                      placeholder="Ex: Quadra 305 Sul, Palmas, TO"
+                      className="w-full text-xs text-gray-800 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             <Button
               size="lg"
               className="w-full"
               onClick={handleSubmit}
-              disabled={!selectedCategory || !image || isCreating}
+              disabled={!selectedCategory || !image || !locAddress || isCreating}
             >
               {isCreating ? 'Enviando...' : 'Enviar Denúncia'}
             </Button>
