@@ -12,7 +12,9 @@ export function Badge({ status, children, className = '' }: BadgeProps) {
   };
 
   return (
-    <span className={`inline-flex items-center justify-center w-28 py-1.5 rounded-full text-sm font-semibold ${statusColors[status]} ${className}`}>
+    <span
+      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold leading-normal sm:px-4 sm:py-2 sm:text-sm ${statusColors[status]} ${className}`}
+    >
       {children}
     </span>
   );
