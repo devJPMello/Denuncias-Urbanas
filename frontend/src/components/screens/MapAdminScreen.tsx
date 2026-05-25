@@ -3,7 +3,7 @@ import { MdLocationOn, MdFilterList, MdSearch, MdZoomIn, MdZoomOut, MdMyLocation
 import { CategoryType, categoryConfig } from '../CategoryChip';
 import { Badge } from '../Badge';
 import { ExportButton } from '../ExportButton';
-import { LeafletMap, MapMarker } from '../LeafletMap';
+import { LeafletMap, MapMarker, type LeafletMapApi } from '../LeafletMap';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDenuncias } from '../../hooks/api/useDenuncias';
 
@@ -26,7 +26,7 @@ export function MapAdminScreen() {
   const [search, setSearch]                     = useState('');
   const [panelOpen, setPanelOpen]               = useState(false);
   const [activeId, setActiveId]                 = useState<string | null>(null);
-  const mapContainerRef = useRef<HTMLElement & { _leafletLocate?: () => void; _leafletFlyTo?: (lat: number, lng: number, z?: number) => void } | null>(null);
+  const mapApiRef = useRef<LeafletMapApi | null>(null);
 
   const { complaints, isLoading } = useDenuncias();
 
@@ -55,12 +55,12 @@ export function MapAdminScreen() {
     setActiveId(id);
     const report = filteredReports.find(r => r.id === id);
     if (report?.lat && report?.lng) {
-      (mapContainerRef.current as any)?._leafletFlyTo?.(report.lat, report.lng, 16);
+      mapApiRef.current?.flyTo(report.lat, report.lng, 16);
     }
   };
 
   const handleLocate = () => {
-    (mapContainerRef.current as any)?._leafletLocate?.();
+    mapApiRef.current?.locate();
   };
 
   return (
@@ -183,20 +183,21 @@ export function MapAdminScreen() {
             zoom={14}
             markers={markers}
             onMarkerClick={handleMarkerClick}
+            onMapReady={(api) => { mapApiRef.current = api; }}
             className="absolute inset-0"
           />
 
           {/* Controles do mapa */}
           <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-[400]">
             <button
-              onClick={() => (mapContainerRef.current as any)?._leafletFlyTo?.(-10.1840, -48.3336, 14)}
+              onClick={() => mapApiRef.current?.flyTo(-10.1840, -48.3336, 14)}
               className="p-3 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all border border-gray-200"
               title="Zoom in"
             >
               <MdZoomIn className="w-5 h-5 text-gray-700" />
             </button>
             <button
-              onClick={() => (mapContainerRef.current as any)?._leafletFlyTo?.(-10.1840, -48.3336, 12)}
+              onClick={() => mapApiRef.current?.flyTo(-10.1840, -48.3336, 12)}
               className="p-3 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all border border-gray-200"
               title="Zoom out"
             >

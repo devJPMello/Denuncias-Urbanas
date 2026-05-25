@@ -24,12 +24,18 @@ export interface MapMarker {
   popupHtml?: string;
 }
 
+export interface LeafletMapApi {
+  flyTo: (lat: number, lng: number, zoom?: number) => void;
+  locate: () => void;
+}
+
 export interface LeafletMapProps {
   center?: [number, number];
   zoom?: number;
   markers?: MapMarker[];
   className?: string;
   onMarkerClick?: (id: string) => void;
+  onMapReady?: (api: LeafletMapApi) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,6 +69,7 @@ export function LeafletMap({
   markers = [],
   className = '',
   onMarkerClick,
+  onMapReady,
 }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<L.Map | null>(null);
@@ -110,8 +117,13 @@ export function LeafletMap({
     });
 
     map.addLayer(cluster);
-    mapRef.current   = map;
+    mapRef.current     = map;
     clusterRef.current = cluster;
+
+    onMapReady?.({
+      flyTo: (lat, lng, z = 15) => map.flyTo([lat, lng], z, { duration: 1 }),
+      locate: () => map.locate({ setView: true, maxZoom: 16 }),
+    });
 
     return () => {
       map.remove();
@@ -144,20 +156,19 @@ export function LeafletMap({
     });
   }, [markers, onMarkerClick]);
 
-  // ── Expõe método de localizar usuário via ref no container ─────────────────
+  // Ajusta o zoom para mostrar todos os marcadores quando houver mais de um
   useEffect(() => {
-    const el = containerRef.current as HTMLElement & {
-      _leafletLocate?: () => void;
-      _leafletFlyTo?: (lat: number, lng: number, z?: number) => void;
-    };
-    if (!el) return;
-    el._leafletLocate = () => {
-      mapRef.current?.locate({ setView: true, maxZoom: 16 });
-    };
-    el._leafletFlyTo = (lat, lng, z = 15) => {
-      mapRef.current?.flyTo([lat, lng], z, { duration: 1 });
-    };
-  });
+    const map = mapRef.current;
+    if (!map || markers.length === 0) return;
+
+    if (markers.length === 1) {
+      map.setView([markers[0].lat, markers[0].lng], Math.max(map.getZoom(), 15), { animate: true });
+      return;
+    }
+
+    const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lng] as [number, number]));
+    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 16, animate: true });
+  }, [markers]);
 
   return (
     <div

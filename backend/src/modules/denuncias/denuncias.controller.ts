@@ -35,6 +35,16 @@ export class DenunciasController {
     return this.denunciasService.findByAutorId(user.id);
   }
 
+  /** Preview de coordenadas a partir do endereço (evita CORS no browser). */
+  @UseGuards(ClerkAuthGuard)
+  @Get('geocode-preview')
+  async geocodePreview(@Query('address') address: string) {
+    if (!address?.trim()) {
+      throw new BadRequestException('Informe o endereço');
+    }
+    return this.denunciasService.geocodeAddress(address);
+  }
+
   @Get(':id/imagem')
   async getImagem(@Param('id') id: string, @Res() res: Response) {
     const img = await this.denunciasService.getImagem(id);

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -14,6 +14,7 @@ import {
   JOB_ASSIGN_COMPLAINT,
   AssignComplaintJob,
 } from '../queue/queue.constants';
+import { GeocodeService } from '../geocode/geocode.service';
 
 const DENUNCIA_LIST_INCLUDE = {
   autor: { select: { id: true, nome: true, email: true } },
@@ -41,6 +42,7 @@ const DENUNCIA_LIST_SELECT = {
 export class DenunciasService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly geocode: GeocodeService,
     @InjectQueue(QUEUE_COMPLAINT_ASSIGNMENT) private readonly assignmentQueue: Queue,
   ) {}
 
@@ -76,6 +78,14 @@ export class DenunciasService {
   }
 
   /** Retorna bytes da imagem armazenada no banco (ou null). */
+  async geocodeAddress(address: string) {
+    const coords = await this.geocode.resolve(address);
+    if (!coords) {
+      throw new BadRequestException('Endereço não encontrado em Palmas. Tente "305 Sul" ou "103 Norte".');
+    }
+    return coords;
+  }
+
   async getImagem(id: string): Promise<{ buffer: Buffer; mime: string } | null> {
     const row = await this.prisma.denuncia.findUnique({
       where: { id },
@@ -109,14 +119,16 @@ export class DenunciasService {
   }
 
   async create(dto: CreateDenunciaDto & { autorId: string }): Promise<DenunciaPublica> {
+    const coords = await this.resolveCoordinates(dto.endereco, dto.lat, dto.lng);
+
     const denuncia = await this.prisma.denuncia.create({
       data: {
         titulo:      dto.titulo,
         descricao:   dto.descricao,
         categoria:   dto.categoria,
         endereco:    dto.endereco,
-        lat:         dto.lat,
-        lng:         dto.lng,
+        lat:         coords.lat,
+        lng:         coords.lng,
         autorId:     dto.autorId,
         imagemBytes: dto.imagemBytes,
         imagemMime:  dto.imagemMime,
@@ -151,5 +163,42 @@ export class DenunciasService {
   async remove(id: string) {
     await this.findOne(id);
     return this.prisma.denuncia.delete({ where: { id } });
+  }
+
+  /**
+   * Coordenadas vêm do endereço (geocoding no servidor).
+   * lat/lng do cliente só entram se o usuário ajustou o pin no mapa (ambos enviados).
+   */
+  private async resolveCoordinates(
+    endereco: string,
+    clientLat?: number,
+    clientLng?: number,
+  ): Promise<{ lat: number; lng: number }> {
+    const geocoded = await this.geocode.resolve(endereco);
+
+    const hasClientPin =
+      clientLat != null &&
+      clientLng != null &&
+      Number.isFinite(clientLat) &&
+      Number.isFinite(clientLng);
+
+    if (geocoded) {
+      if (hasClientPin) {
+        const dLat = Math.abs(geocoded.lat - clientLat);
+        const dLng = Math.abs(geocoded.lng - clientLng);
+        if (dLat > 0.002 || dLng > 0.002) {
+          return { lat: clientLat, lng: clientLng };
+        }
+      }
+      return { lat: geocoded.lat, lng: geocoded.lng };
+    }
+
+    if (hasClientPin) {
+      return { lat: clientLat, lng: clientLng };
+    }
+
+    throw new BadRequestException(
+      'Não foi possível localizar o endereço no mapa. Use o pin no mapa ou inclua quadra e setor (ex: 305 Sul, Palmas).',
+    );
   }
 }

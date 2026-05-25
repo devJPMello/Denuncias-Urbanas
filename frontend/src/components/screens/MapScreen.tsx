@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { MdSearch, MdAdd, MdList, MdPerson, MdFilterList, MdCamera, MdLocationOn, MdClose, MdMyLocation, MdPhoto, MdRefresh, MdGpsFixed } from 'react-icons/md';
 import { NotificationBell } from '../NotificationBell';
 import { CategoryType, CategoryChip } from '../CategoryChip';
-import { LeafletMap, MapMarker } from '../LeafletMap';
+import { LeafletMap, MapMarker, type LeafletMapApi } from '../LeafletMap';
+import { LocationPickerMap } from '../LocationPickerMap';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Textarea } from '../Textarea';
@@ -11,6 +12,7 @@ import { useDenuncias } from '../../hooks/api/useDenuncias';
 import { useCreateDenuncia } from '../../hooks/api/useCreateDenuncia';
 import { useAuth } from '@clerk/clerk-react';
 import { CLERK_ENABLED } from '../../lib/auth';
+import { forwardGeocode, reverseGeocode } from '../../lib/geocode';
 
 // ── Cores dos marcadores (matches theme.css) ──────────────────────────────────
 const CATEGORY_COLORS: Record<CategoryType, string> = {
@@ -49,8 +51,10 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
   const [locAccuracy, setLocAccuracy] = useState<number | null>(null);
   const [locLoading,  setLocLoading]  = useState(false);
   const [locError,    setLocError]    = useState<string | null>(null);
+  const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const [pinAdjusted, setPinAdjusted]     = useState(false);
 
-  const mapContainerRef = useRef<HTMLElement & { _leafletLocate?: () => void } | null>(null);
+  const mapApiRef = useRef<LeafletMapApi | null>(null);
   const fileInputRef    = useRef<HTMLInputElement>(null);   // galeria / pasta
   const cameraInputRef  = useRef<HTMLInputElement>(null);   // câmera
 
@@ -77,20 +81,7 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
     }));
 
   const handleLocate = () => {
-    (mapContainerRef.current as any)?._leafletLocate?.();
-  };
-
-  // Converte lat/lng em endereço legível via Nominatim
-  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
-    try {
-      const res  = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=pt-BR`,
-      );
-      const data = await res.json();
-      return data.display_name as string;
-    } catch {
-      return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    }
+    mapApiRef.current?.locate();
   };
 
   const applyPosition = async (coords: GeolocationCoordinates) => {
@@ -100,6 +91,28 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
     const addr = await reverseGeocode(lat, lng);
     setLocAddress(addr);
     setLocLoading(false);
+  };
+
+  /** Atualiza lat/lng a partir do texto do endereço (quando o usuário edita manualmente). */
+  const syncCoordsFromAddress = async (address: string) => {
+    const trimmed = address.trim();
+    if (trimmed.length < 5) return;
+
+    setGeocodeLoading(true);
+    setLocError(null);
+    setPinAdjusted(false);
+    try {
+      const token = CLERK_ENABLED ? await getToken() : null;
+      const coords = await forwardGeocode(trimmed, token);
+      if (!coords) {
+        setLocError('Endereço não encontrado. Use o mapa abaixo para posicionar o pin.');
+        return;
+      }
+      setLocCoords({ lat: coords.lat, lng: coords.lng });
+      mapApiRef.current?.flyTo(coords.lat, coords.lng, 16);
+    } finally {
+      setGeocodeLoading(false);
+    }
   };
 
   const detectLocation = () => {
@@ -159,14 +172,23 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
         throw new Error('Adicione uma foto da denúncia.');
       }
 
+      const endereco = locAddress?.trim() ?? '';
+      if (!endereco) {
+        throw new Error('Informe o endereço da ocorrência.');
+      }
+
+      if (!locCoords) {
+        throw new Error('Localize o endereço no mapa antes de enviar.');
+      }
+
       await create({
         titulo:     `${selectedCategory} — denúncia`,
         descricao:  description || 'Sem descrição',
         categoria:  selectedCategory as any,
-        endereco:   locAddress ?? 'Endereço não informado',
+        endereco,
         imagemFile: imageFile,
-        lat:        locCoords?.lat,
-        lng:        locCoords?.lng,
+        lat:        locCoords.lat,
+        lng:        locCoords.lng,
       });
 
       setSubmitted(true);
@@ -180,6 +202,7 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
         setLocCoords(null);
         setLocAccuracy(null);
         setLocError(null);
+        setPinAdjusted(false);
       }, 2000);
     } catch {
       // erro tratado pelo hook (TanStack Query)
@@ -249,6 +272,11 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: i * 0.05 }}
                     className="flex items-center gap-3 p-2.5 bg-gradient-to-r from-gray-50 to-white rounded-xl hover:shadow-md cursor-pointer transition-all border border-gray-100"
+                    onClick={() => {
+                      if (report.lat != null && report.lng != null) {
+                        mapApiRef.current?.flyTo(report.lat, report.lng, 16);
+                      }
+                    }}
                   >
                     <div
                       className="w-3 h-3 rounded-full flex-shrink-0 shadow"
@@ -272,6 +300,7 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
               zoom={14}
               markers={markers}
               className="absolute inset-0"
+              onMapReady={(api) => { mapApiRef.current = api; }}
             />
 
             {/* Botão localizar */}
@@ -414,17 +443,40 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
                       type="text"
                       value={locAddress ?? ''}
                       onChange={(e) => setLocAddress(e.target.value)}
+                      onBlur={() => locAddress && syncCoordsFromAddress(locAddress)}
                       placeholder="Digite o endereço do problema..."
                       className="w-full text-xs text-gray-800 bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
-                    <p className="text-[10px] text-gray-400 mt-1">Edite se o endereço estiver incorreto</p>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {geocodeLoading ? 'Atualizando posição no mapa...' : 'Ao editar o endereço, o pin será recalculado'}
+                    </p>
                   </div>
                   <button onClick={detectLocation} title="Atualizar localização" className="p-1.5 hover:bg-blue-200 rounded-lg transition-colors flex-shrink-0">
                     <MdRefresh className="w-4 h-4 text-primary" />
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : null}
+
+            {locCoords && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-700">
+                  Ajuste o pin no mapa {pinAdjusted ? '(posição manual)' : ''}
+                </p>
+                <LocationPickerMap
+                  lat={locCoords.lat}
+                  lng={locCoords.lng}
+                  accuracy={locAccuracy ?? undefined}
+                  className="h-48 rounded-2xl overflow-hidden border border-gray-200"
+                  onPositionChange={(lat, lng) => {
+                    setLocCoords({ lat, lng });
+                    setPinAdjusted(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {!locCoords ? (
               <div className="space-y-2">
                 <button
                   type="button"
@@ -447,21 +499,8 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
                     {locError && <p className="text-xs text-red-500 mt-0.5">{locError}</p>}
                   </div>
                 </button>
-
-                {locError && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3">
-                    <p className="text-xs font-semibold text-gray-700 mb-1.5">Digite o endereço manualmente</p>
-                    <input
-                      type="text"
-                      value={locAddress ?? ''}
-                      onChange={(e) => setLocAddress(e.target.value)}
-                      placeholder="Ex: Quadra 305 Sul, Palmas, TO"
-                      className="w-full text-xs text-gray-800 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                    />
-                  </div>
-                )}
               </div>
-            )}
+            ) : null}
 
             {CLERK_ENABLED && !isSignedIn && (
               <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
@@ -482,11 +521,13 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
                 !selectedCategory ||
                 !imageFile ||
                 !locAddress ||
+                !locCoords ||
                 isCreating ||
+                geocodeLoading ||
                 (CLERK_ENABLED && !isSignedIn)
               }
             >
-              {isCreating ? 'Enviando...' : 'Enviar Denúncia'}
+              {geocodeLoading ? 'Localizando endereço...' : isCreating ? 'Enviando...' : 'Enviar Denúncia'}
             </Button>
           </div>
         )}
