@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { MdSearch, MdAdd, MdList, MdPerson, MdFilterList, MdCamera, MdLocationOn, MdClose, MdMyLocation, MdPhoto, MdRefresh, MdGpsFixed } from 'react-icons/md';
 import { NotificationBell } from '../NotificationBell';
 import { CategoryType, CategoryChip } from '../CategoryChip';
@@ -13,6 +13,8 @@ import { useCreateDenuncia } from '../../hooks/api/useCreateDenuncia';
 import { useAuth } from '@clerk/clerk-react';
 import { CLERK_ENABLED } from '../../lib/auth';
 import { forwardGeocode, reverseGeocode } from '../../lib/geocode';
+import { MobileOccurrenceSheet, type MobileSheetMode } from '../MobileOccurrenceSheet';
+import type { Complaint } from '../../types';
 
 // ── Cores dos marcadores (matches theme.css) ──────────────────────────────────
 const CATEGORY_COLORS: Record<CategoryType, string> = {
@@ -36,6 +38,8 @@ interface MapScreenProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
   const [searchQuery, setSearchQuery]               = useState('');
+  const [mobileSheet, setMobileSheet]               = useState<MobileSheetMode>('closed');
+  const [selectedReport, setSelectedReport]         = useState<Complaint | null>(null);
   const [showNewReportModal, setShowNewReportModal] = useState(false);
   const [selectedCategory, setSelectedCategory]     = useState<CategoryType | null>(null);
   const [description, setDescription]               = useState('');
@@ -83,6 +87,19 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
   const handleLocate = () => {
     mapApiRef.current?.locate();
   };
+
+  const openReportDetail = useCallback((report: Complaint) => {
+    setSelectedReport(report);
+    setMobileSheet('detail');
+    if (report.lat != null && report.lng != null) {
+      mapApiRef.current?.flyTo(report.lat, report.lng, 16);
+    }
+  }, []);
+
+  const closeMobileSheet = useCallback(() => {
+    setMobileSheet('closed');
+    setSelectedReport(null);
+  }, []);
 
   const applyPosition = async (coords: GeolocationCoordinates) => {
     const { latitude: lat, longitude: lng, accuracy } = coords;
@@ -237,8 +254,8 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
         {/* Body */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
 
-          {/* Painel lateral */}
-          <div className="md:w-80 md:border-r border-border bg-white order-2 md:order-1 flex flex-col overflow-hidden max-h-48 md:max-h-none">
+          {/* Painel lateral — só desktop; no celular usa bottom sheet */}
+          <div className="hidden md:flex md:w-80 md:border-r border-border bg-white md:order-1 flex-col overflow-hidden">
             <div className="bg-white px-4 pt-3 pb-3 border-b border-border space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-sm">Ocorrências Próximas</h3>
@@ -272,11 +289,7 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: i * 0.05 }}
                     className="flex items-center gap-3 p-2.5 bg-gradient-to-r from-gray-50 to-white rounded-xl hover:shadow-md cursor-pointer transition-all border border-gray-100"
-                    onClick={() => {
-                      if (report.lat != null && report.lng != null) {
-                        mapApiRef.current?.flyTo(report.lat, report.lng, 16);
-                      }
-                    }}
+                    onClick={() => openReportDetail(report)}
                   >
                     <div
                       className="w-3 h-3 rounded-full flex-shrink-0 shadow"
@@ -293,18 +306,38 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
             </div>
           </div>
 
-          {/* Mapa */}
-          <div className="flex-1 relative order-1 md:order-2 min-h-[40vh] md:min-h-0">
+          {/* Mapa — tela cheia no celular */}
+          <div className="flex-1 relative order-1 md:order-2 min-h-0">
             <LeafletMap
               center={[-10.1840, -48.3336]}
               zoom={14}
               markers={markers}
               className="absolute inset-0"
               onMapReady={(api) => { mapApiRef.current = api; }}
+              onMarkerClick={(id) => {
+                const report = complaints.find(r => r.id === id);
+                if (report) openReportDetail(report);
+              }}
             />
 
-            {/* Botão localizar */}
-            <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-[400]">
+            {/* Controles do mapa (localizar + nova denúncia) — dentro do mapa, acima do painel no mobile */}
+            <div
+              className={`absolute right-4 bottom-4 max-md:bottom-32 flex flex-col items-end gap-3 z-[400] transition-opacity duration-200 ${
+                mobileSheet !== 'closed' ? 'max-md:opacity-0 max-md:pointer-events-none' : ''
+              }`}
+            >
+              <motion.button
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                whileHover={{ scale: 1.1, rotate: 90, transition: { type: 'spring', stiffness: 400 } }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.5 }}
+                onClick={() => setShowNewReportModal(true)}
+                className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl shadow-2xl hover:shadow-green-500/50 flex items-center justify-center"
+                aria-label="Nova denúncia"
+              >
+                <MdAdd className="w-7 h-7" />
+              </motion.button>
               <button
                 onClick={handleLocate}
                 className="p-3 bg-gradient-to-br from-primary to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all"
@@ -315,20 +348,20 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
             </div>
           </div>
         </div>
-
-        {/* FAB nova denúncia */}
-        <motion.button
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          whileHover={{ scale: 1.1, rotate: 90, transition: { type: 'spring', stiffness: 400 } }}
-          whileTap={{ scale: 0.95 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.5 }}
-          onClick={() => setShowNewReportModal(true)}
-          className="fixed bottom-20 right-4 w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl shadow-2xl hover:shadow-green-500/50 flex items-center justify-center z-[500]"
-        >
-          <MdAdd className="w-7 h-7" />
-        </motion.button>
       </div>
+
+      <MobileOccurrenceSheet
+        mode={mobileSheet}
+        selected={selectedReport}
+        reports={filteredReports}
+        isLoading={isLoading}
+        searchQuery={searchQuery}
+        categoryColors={CATEGORY_COLORS}
+        onSearchChange={setSearchQuery}
+        onOpenList={() => setMobileSheet('list')}
+        onSelect={openReportDetail}
+        onClose={closeMobileSheet}
+      />
 
       {/* Modal nova denúncia */}
       <Modal

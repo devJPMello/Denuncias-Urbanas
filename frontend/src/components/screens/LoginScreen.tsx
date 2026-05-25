@@ -86,25 +86,27 @@ export function LoginScreen({ onBack, onLogin }: LoginScreenProps) {
       {/* Coluna direita — formulário Clerk */}
       <div className="flex-1 flex flex-col relative z-10 overflow-y-auto">
 
-        {/* Header mobile */}
+        {/* Header mobile — afastado do topo (botão voltar + notch) */}
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="md:hidden flex flex-col items-center mb-6 px-6"
+          className="md:hidden flex flex-col items-center px-6 pt-[calc(5.5rem+env(safe-area-inset-top,0px))] pb-4 mb-2"
         >
-          <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center mb-3">
-            <MdLocationOn className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 bg-white/15 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+            <MdLocationOn className="w-9 h-9 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-white">Bem-vindo</h2>
-          <p className="text-white/80 text-sm mt-1">Entre para acompanhar suas denúncias</p>
+          <p className="text-white/80 text-sm mt-2 text-center max-w-[260px]">
+            Entre para acompanhar suas denúncias
+          </p>
         </motion.div>
 
         <motion.div
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="flex-1 flex items-center justify-center px-6 md:px-10 lg:px-16 pb-8"
+          className="flex-1 flex items-start md:items-center justify-center px-6 md:px-10 lg:px-16 pb-8 pt-2 md:pt-0"
         >
           <div className="w-full max-w-md">
             {!CLERK_ENABLED && (
