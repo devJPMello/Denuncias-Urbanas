@@ -1,6 +1,5 @@
 /**
- * useCreateDenuncia — envia nova denúncia via TanStack Query mutation.
- * Invalida automaticamente os caches de denúncias após criação.
+ * useCreateDenuncia — envia nova denúncia (multipart se houver foto).
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-react';
@@ -14,6 +13,23 @@ interface UseCreateDenunciaResult {
   error:     string | null;
 }
 
+function buildFormData(payload: CreateDenunciaPayload): FormData {
+  const { imagemFile, ...fields } = payload;
+  const fd = new FormData();
+
+  if (imagemFile) {
+    fd.append('imagem', imagemFile);
+  }
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined && value !== null) {
+      fd.append(key, String(value));
+    }
+  }
+
+  return fd;
+}
+
 export function useCreateDenuncia(): UseCreateDenunciaResult {
   const { getToken } = useAuth();
   const queryClient  = useQueryClient();
@@ -21,10 +37,10 @@ export function useCreateDenuncia(): UseCreateDenunciaResult {
   const { mutateAsync, isPending, error } = useMutation<ApiDenuncia, Error, CreateDenunciaPayload>({
     mutationFn: async (payload) => {
       const token = CLERK_ENABLED ? await getToken() : null;
-      return api.post<ApiDenuncia>('/denuncias', payload, token);
+      const formData = buildFormData(payload);
+      return api.upload<ApiDenuncia>('/denuncias', formData, token);
     },
     onSuccess: () => {
-      // Invalida listas → próximo acesso vai buscar do servidor
       queryClient.invalidateQueries({ queryKey: ['denuncias'] });
       queryClient.invalidateQueries({ queryKey: ['my-denuncias'] });
     },

@@ -41,8 +41,6 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
   // Imagem: File para upload real + preview local
   const [imageFile,    setImageFile]    = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isUploading,  setIsUploading]  = useState(false);
-
   const [submitted, setSubmitted] = useState(false);
 
   // ── Geolocalização ───────────────────────────────────────────────────────────
@@ -57,8 +55,8 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
   const cameraInputRef  = useRef<HTMLInputElement>(null);   // câmera
 
   const { complaints, isLoading } = useDenuncias();
-  const { create, isLoading: isCreating } = useCreateDenuncia();
-  const { getToken } = useAuth();
+  const { create, isLoading: isCreating, error: createError } = useCreateDenuncia();
+  const { getToken, isSignedIn } = useAuth();
 
   const filteredReports = complaints.filter(r =>
     !searchQuery || r.address.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -150,53 +148,25 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
     setImagePreview(null);
   };
 
-  /** Faz upload do arquivo e retorna a URL do servidor. */
-  const uploadImage = async (file: File): Promise<string | undefined> => {
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const token = CLERK_ENABLED ? await getToken() : null;
-      const headers: Record<string, string> = token
-        ? { Authorization: `Bearer ${token}` }
-        : {};
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error(`Upload falhou: HTTP ${res.status}`);
-      const { url } = await res.json() as { url: string };
-      return url;
-    } catch (err) {
-      console.error('Erro no upload:', err);
-      return undefined;
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleSubmit = async () => {
     if (!selectedCategory) return;
+    if (CLERK_ENABLED && !isSignedIn) {
+      return;
+    }
 
     try {
-      // Faz upload da imagem antes de criar a denúncia
-      let imagemUrl: string | undefined;
-      if (imageFile) {
-        imagemUrl = await uploadImage(imageFile);
+      if (!imageFile) {
+        throw new Error('Adicione uma foto da denúncia.');
       }
 
       await create({
-        titulo:    `${selectedCategory} — denúncia`,
-        descricao: description || 'Sem descrição',
-        categoria: selectedCategory as any,
-        endereco:  locAddress ?? 'Endereço não informado',
-        imagemUrl,
-        lat:       locCoords?.lat,
-        lng:       locCoords?.lng,
+        titulo:     `${selectedCategory} — denúncia`,
+        descricao:  description || 'Sem descrição',
+        categoria:  selectedCategory as any,
+        endereco:   locAddress ?? 'Endereço não informado',
+        imagemFile: imageFile,
+        lat:        locCoords?.lat,
+        lng:        locCoords?.lng,
       });
 
       setSubmitted(true);
@@ -493,13 +463,30 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
               </div>
             )}
 
+            {CLERK_ENABLED && !isSignedIn && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                Faça login para enviar uma denúncia.
+              </p>
+            )}
+            {createError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                {createError}
+              </p>
+            )}
+
             <Button
               size="lg"
               className="w-full"
               onClick={handleSubmit}
-              disabled={!selectedCategory || !imageFile || !locAddress || isCreating || isUploading}
+              disabled={
+                !selectedCategory ||
+                !imageFile ||
+                !locAddress ||
+                isCreating ||
+                (CLERK_ENABLED && !isSignedIn)
+              }
             >
-              {isUploading ? 'Enviando foto...' : isCreating ? 'Enviando...' : 'Enviar Denúncia'}
+              {isCreating ? 'Enviando...' : 'Enviar Denúncia'}
             </Button>
           </div>
         )}

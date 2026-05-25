@@ -7,9 +7,17 @@
  */
 
 import { io, Socket } from 'socket.io-client';
+import { API_BASE_URL } from './api';
 
-const SOCKET_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000';
+/** Socket.io fica na raiz do servidor, não em /api. */
+function resolveSocketUrl(): string {
+  if (API_BASE_URL.startsWith('http')) {
+    return API_BASE_URL.replace(/\/api$/, '');
+  }
+  return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+}
+
+const SOCKET_URL = resolveSocketUrl();
 
 class SocketService {
   private socket: Socket | null = null;

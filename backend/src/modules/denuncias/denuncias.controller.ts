@@ -1,17 +1,23 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller, Get, Post, Put, Delete, Body, Param, Query,
+  UseGuards, UseInterceptors, UploadedFile, BadRequestException, NotFoundException, Res,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 import { DenunciasService } from './denuncias.service';
 import { CreateDenunciaDto } from './dto/create-denuncia.dto';
 import { UpdateDenunciaDto } from './dto/update-denuncia.dto';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
-import { AdminGuard }     from '../auth/guards/admin.guard';
-import { CurrentUser }    from '../auth/decorators/current-user.decorator';
-import type { Usuario }   from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { Usuario } from '@prisma/client';
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 @Controller('denuncias')
 export class DenunciasController {
   constructor(private readonly denunciasService: DenunciasService) {}
 
-  /** Lista pública com paginação opcional (?limit=100&page=1). */
   @Get()
   findAll(
     @Query('limit') limit?: string,
@@ -23,12 +29,19 @@ export class DenunciasController {
     });
   }
 
-  /** Retorna apenas as denúncias do usuário autenticado.
-   *  DEVE ficar antes de :id para não ser capturado como parâmetro. */
   @UseGuards(ClerkAuthGuard)
   @Get('mine')
   findMine(@CurrentUser() user: Usuario) {
     return this.denunciasService.findByAutorId(user.id);
+  }
+
+  @Get(':id/imagem')
+  async getImagem(@Param('id') id: string, @Res() res: Response) {
+    const img = await this.denunciasService.getImagem(id);
+    if (!img) throw new NotFoundException('Imagem não encontrada');
+    res.setHeader('Content-Type', img.mime);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(img.buffer);
   }
 
   @Get(':id')
@@ -38,8 +51,29 @@ export class DenunciasController {
 
   @UseGuards(ClerkAuthGuard)
   @Post()
-  create(@Body() dto: CreateDenunciaDto, @CurrentUser() user: Usuario) {
-    return this.denunciasService.create({ ...dto, autorId: user.id });
+  @UseInterceptors(
+    FileInterceptor('imagem', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_IMAGE_BYTES },
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(new BadRequestException('Apenas imagens são permitidas'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  create(
+    @Body() dto: CreateDenunciaDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: Usuario,
+  ) {
+    return this.denunciasService.create({
+      ...dto,
+      autorId: user.id,
+      imagemBytes: file?.buffer,
+      imagemMime:  file?.mimetype,
+    });
   }
 
   @Put(':id')

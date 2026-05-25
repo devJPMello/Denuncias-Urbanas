@@ -50,3 +50,6 @@ frontend/dist/workbox-*.js
 
 # Docker volumes (se criados localmente)
 postgres_data/
+
+# Uploads legados (imagens agora ficam no banco)
+backend/uploads/
