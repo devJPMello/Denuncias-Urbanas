@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { MdLocationOn, MdFilterList, MdSearch, MdZoomIn, MdZoomOut, MdMyLocation, MdClose } from 'react-icons/md';
 import { CategoryType, categoryConfig } from '../CategoryChip';
 import { Badge } from '../Badge';
 import { ExportButton } from '../ExportButton';
 import { LeafletMap, MapMarker } from '../LeafletMap';
 import { motion, AnimatePresence } from 'motion/react';
-import { useRef } from 'react';
+import { useDenuncias } from '../../hooks/api/useDenuncias';
 
-// ── Cores por categoria (matches theme.css) ───────────────────────────────────
+// ── Cores por categoria ────────────────────────────────────────────────────────
 const CATEGORY_COLORS: Record<CategoryType, string> = {
   buraco:     '#EF4444',
   lixo:       '#F59E0B',
@@ -15,14 +15,6 @@ const CATEGORY_COLORS: Record<CategoryType, string> = {
   calcada:    '#F97316',
   outros:     '#6B7280',
 };
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
-const mockReports = [
-  { id: '1', category: 'buraco'     as CategoryType, address: 'Av. Paulista, 1578 — Bela Vista', status: 'analysis' as const, date: '18/05/2026', lat: -23.5616, lng: -46.6564 },
-  { id: '2', category: 'lixo'       as CategoryType, address: 'Rua Augusta, 2450 — Consolação',  status: 'open'     as const, date: '15/05/2026', lat: -23.5530, lng: -46.6500 },
-  { id: '3', category: 'iluminacao' as CategoryType, address: 'Rua da Consolação, 3456',         status: 'resolved' as const, date: '10/05/2026', lat: -23.5562, lng: -46.6490 },
-  { id: '4', category: 'calcada'    as CategoryType, address: 'Av. Rebouças, 1000',              status: 'open'     as const, date: '12/05/2026', lat: -23.5580, lng: -46.6620 },
-];
 
 const statusLabels = { open: 'Aberto', analysis: 'Em Análise', resolved: 'Resolvido' };
 
@@ -35,7 +27,10 @@ export function MapAdminScreen() {
   const [activeId, setActiveId]                 = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLElement & { _leafletLocate?: () => void; _leafletFlyTo?: (lat: number, lng: number, z?: number) => void } | null>(null);
 
-  const filteredReports = mockReports.filter(report => {
+  const { complaints, isLoading } = useDenuncias();
+
+  const filteredReports = complaints.filter(report => {
+    if (report.lat === undefined || report.lng === undefined) return false;
     const categoryMatch = selectedCategory === 'all' || report.category === selectedCategory;
     const statusMatch   = selectedStatus   === 'all' || report.status   === selectedStatus;
     const searchMatch   = !search || report.address.toLowerCase().includes(search.toLowerCase());
@@ -44,12 +39,12 @@ export function MapAdminScreen() {
 
   const markers: MapMarker[] = filteredReports.map(r => ({
     id:    r.id,
-    lat:   r.lat,
-    lng:   r.lng,
+    lat:   r.lat!,
+    lng:   r.lng!,
     color: CATEGORY_COLORS[r.category],
     popupHtml: `
       <div style="font-family:sans-serif;font-size:13px;line-height:1.6;min-width:160px">
-        <strong style="color:#1e293b">#${r.id} — ${r.category}</strong><br/>
+        <strong style="color:#1e293b">${r.category}</strong><br/>
         <span style="color:#475569">${r.address}</span><br/>
         <span style="color:#94a3b8;font-size:11px">${r.date}</span>
       </div>`,
@@ -57,8 +52,8 @@ export function MapAdminScreen() {
 
   const handleMarkerClick = (id: string) => {
     setActiveId(id);
-    const report = mockReports.find(r => r.id === id);
-    if (report) {
+    const report = filteredReports.find(r => r.id === id);
+    if (report?.lat && report?.lng) {
       (mapContainerRef.current as any)?._leafletFlyTo?.(report.lat, report.lng, 16);
     }
   };
@@ -132,13 +127,19 @@ export function MapAdminScreen() {
           ${panelOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
           <div className="p-3 border-b border-border flex items-center justify-between">
-            <h3 className="font-bold text-sm text-gray-900">{filteredReports.length} Ocorrências</h3>
+            <h3 className="font-bold text-sm text-gray-900">
+              {isLoading ? 'Carregando...' : `${filteredReports.length} Ocorrências`}
+            </h3>
             <button onClick={() => setPanelOpen(false)} className="md:hidden p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
               <MdClose className="w-4 h-4 text-gray-600" />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {filteredReports.map((report, i) => {
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : filteredReports.map((report, i) => {
               const Icon   = categoryConfig[report.category].icon;
               const config = categoryConfig[report.category];
               const isActive = activeId === report.id;
@@ -147,7 +148,7 @@ export function MapAdminScreen() {
                   key={report.id}
                   initial={{ x: -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: i * 0.08 }}
+                  transition={{ delay: i * 0.05 }}
                   onClick={() => handleMarkerClick(report.id)}
                   className={`bg-white border rounded-xl p-3 cursor-pointer transition-all hover:shadow-md ${
                     isActive ? 'border-primary shadow-md ring-2 ring-primary/20' : 'border-gray-200'
@@ -159,7 +160,6 @@ export function MapAdminScreen() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <span className="text-xs font-semibold text-gray-500">#{report.id}</span>
                         <Badge status={report.status} className="!w-auto !px-2 text-[10px]">
                           {statusLabels[report.status]}
                         </Badge>
@@ -178,24 +178,24 @@ export function MapAdminScreen() {
         {/* Mapa real */}
         <div className="flex-1 relative">
           <LeafletMap
-            center={[-23.5505, -46.6333]}
+            center={[-10.1840, -48.3336]}
             zoom={14}
             markers={markers}
             onMarkerClick={handleMarkerClick}
             className="absolute inset-0"
           />
 
-          {/* Controles do mapa (z-index acima das tiles do Leaflet = 400+) */}
+          {/* Controles do mapa */}
           <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-[400]">
             <button
-              onClick={() => (mapContainerRef.current as any)?._leafletFlyTo?.(-23.5505, -46.6333, 14)}
+              onClick={() => (mapContainerRef.current as any)?._leafletFlyTo?.(-10.1840, -48.3336, 14)}
               className="p-3 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all border border-gray-200"
               title="Zoom in"
             >
               <MdZoomIn className="w-5 h-5 text-gray-700" />
             </button>
             <button
-              onClick={() => (mapContainerRef.current as any)?._leafletFlyTo?.(-23.5505, -46.6333, 12)}
+              onClick={() => (mapContainerRef.current as any)?._leafletFlyTo?.(-10.1840, -48.3336, 12)}
               className="p-3 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all border border-gray-200"
               title="Zoom out"
             >
@@ -223,7 +223,7 @@ export function MapAdminScreen() {
           <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg border border-gray-200 z-[400] pointer-events-none">
             <div className="flex items-center gap-2">
               <MdLocationOn className="w-4 h-4 text-primary" />
-              <p className="text-xs font-semibold text-gray-900">São Paulo, SP</p>
+              <p className="text-xs font-semibold text-gray-900">Palmas, TO</p>
               <span className="text-xs text-gray-400">· {filteredReports.length} ocorrências</span>
             </div>
           </div>

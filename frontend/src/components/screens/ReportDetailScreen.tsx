@@ -1,54 +1,87 @@
-import { MdArrowBack, MdLocationOn, MdCalendarToday, MdMessage, MdCheck, MdWifi } from 'react-icons/md';
+import { MdArrowBack, MdLocationOn, MdCalendarToday, MdCheck, MdWifi } from 'react-icons/md';
 import { Badge } from '../Badge';
 import { categoryConfig, CategoryType } from '../CategoryChip';
 import { LeafletMap, MapMarker } from '../LeafletMap';
+import { SkeletonCard } from '../Skeleton';
 import { motion, AnimatePresence } from 'motion/react';
 import { useRealTimeComplaint } from '../../hooks/useRealTimeComplaint';
+import { useDenuncia } from '../../hooks/api/useDenuncia';
 
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface ReportDetailScreenProps {
+  reportId: string | null;
   onBack: () => void;
 }
 
-const mockReport = {
-  id:          '1',
-  category:    'buraco' as CategoryType,
-  image:       'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=800',
-  address:     'Av. Paulista, 1578 - Bela Vista, São Paulo - SP',
-  date:        '18/05/2026',
-  status:      'analysis' as const,
-  lat:         -23.5616,
-  lng:         -46.6564,
-  description: 'Buraco grande na pista, causando risco para veículos e pedestres. O problema se agravou após as últimas chuvas.',
-  timeline: [
-    { date: '18/05/2026 14:30', status: 'Denúncia recebida',      active: true  },
-    { date: '19/05/2026 09:15', status: 'Em análise pela equipe', active: true  },
-    { date: 'Pendente',         status: 'Resolvido',               active: false },
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const statusLabels = { open: 'Aberto', analysis: 'Em Análise', resolved: 'Resolvido' };
+
+const STATUS_TIMELINE: Record<string, Array<{ status: string; label: string }>> = {
+  open:     [
+    { status: 'open',     label: 'Denúncia recebida'      },
+    { status: '',         label: 'Em análise pela equipe' },
+    { status: '',         label: 'Resolvido'              },
   ],
-  comments: [
-    {
-      author: 'Equipe Municipal',
-      date:   '19/05/2026',
-      text:   'Recebemos sua denúncia e estamos avaliando a situação. Previsão de reparo: 7 dias.',
-    },
+  analysis: [
+    { status: 'open',     label: 'Denúncia recebida'      },
+    { status: 'analysis', label: 'Em análise pela equipe' },
+    { status: '',         label: 'Resolvido'              },
+  ],
+  resolved: [
+    { status: 'open',     label: 'Denúncia recebida'      },
+    { status: 'analysis', label: 'Em análise pela equipe' },
+    { status: 'resolved', label: 'Resolvido'              },
   ],
 };
 
-const statusLabels = { open: 'Aberto', analysis: 'Em Análise', resolved: 'Resolvido' };
-
-export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
-  const Icon   = categoryConfig[mockReport.category].icon;
-  const config = categoryConfig[mockReport.category];
+// ── Component ─────────────────────────────────────────────────────────────────
+export function ReportDetailScreen({ reportId, onBack }: ReportDetailScreenProps) {
+  const { complaint, isLoading, error } = useDenuncia(reportId);
 
   // ── Tempo real ───────────────────────────────────────────────────────────────
   const { liveStatus, liveUpdatedAt, hasLiveUpdate } =
-    useRealTimeComplaint(mockReport.id);
+    useRealTimeComplaint(reportId ?? '');
 
-  const currentStatus = liveStatus ?? mockReport.status;
+  const currentStatus = liveStatus ?? complaint?.status ?? 'open';
+  const category      = (complaint?.category ?? 'outros') as CategoryType;
+  const Icon          = categoryConfig[category].icon;
+  const config        = categoryConfig[category];
+  const timeline      = STATUS_TIMELINE[currentStatus] ?? STATUS_TIMELINE.open;
+
+  // ── Loading state ────────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="h-full flex flex-col bg-background overflow-y-auto p-4 space-y-3">
+        <button onClick={onBack} className="flex items-center gap-2 text-primary font-semibold text-sm mb-2">
+          <MdArrowBack className="w-5 h-5" /> Voltar
+        </button>
+        {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+    );
+  }
+
+  // ── Error state ──────────────────────────────────────────────────────────────
+  if (error || !complaint) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-background gap-4 p-6">
+        <p className="text-sm text-red-500 text-center">{error ?? 'Denúncia não encontrada'}</p>
+        <button onClick={onBack} className="px-4 py-2 bg-primary text-white text-sm rounded-lg">
+          Voltar
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-background overflow-y-auto">
       <div className="relative h-52">
-        <img src={mockReport.image} alt="Denúncia" className="w-full h-full object-cover" />
+        {complaint.image ? (
+          <img src={complaint.image} alt="Denúncia" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+            <Icon className="w-16 h-16 text-gray-300" />
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
         <button
@@ -66,7 +99,7 @@ export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
           <div className="flex items-center gap-2">
             <Badge status={currentStatus}>{statusLabels[currentStatus]}</Badge>
 
-            {/* Indicador "ao vivo" — aparece quando há atualização em tempo real */}
+            {/* Indicador "ao vivo" */}
             <AnimatePresence>
               {hasLiveUpdate && (
                 <motion.div
@@ -108,6 +141,17 @@ export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
             )}
           </AnimatePresence>
 
+          {/* Título */}
+          {complaint.title && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="bg-white rounded-xl shadow-sm p-4"
+            >
+              <h2 className="text-base font-bold text-gray-900">{complaint.title}</h2>
+            </motion.div>
+          )}
+
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -119,7 +163,7 @@ export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
               </div>
               <div className="flex-1">
                 <p className="text-xs text-gray-500">Localização</p>
-                <p className="text-sm font-semibold text-gray-900">{mockReport.address}</p>
+                <p className="text-sm font-semibold text-gray-900">{complaint.address}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -128,21 +172,23 @@ export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
               </div>
               <div className="flex-1">
                 <p className="text-xs text-gray-500">Data de Registro</p>
-                <p className="text-sm font-semibold text-gray-900">{mockReport.date}</p>
+                <p className="text-sm font-semibold text-gray-900">{complaint.date}</p>
               </div>
             </div>
           </motion.div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white rounded-xl shadow-sm p-4"
-            >
-              <h3 className="font-bold mb-2 text-gray-900">Descrição</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">{mockReport.description}</p>
-            </motion.div>
+            {complaint.description && (
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-xl shadow-sm p-4"
+              >
+                <h3 className="font-bold mb-2 text-gray-900">Descrição</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">{complaint.description}</p>
+              </motion.div>
+            )}
 
             <motion.div
               initial={{ y: 20, opacity: 0 }}
@@ -152,79 +198,62 @@ export function ReportDetailScreen({ onBack }: ReportDetailScreenProps) {
             >
               <h3 className="font-bold mb-3 text-gray-900">Linha do Tempo</h3>
               <div className="space-y-3">
-                {mockReport.timeline.map((item, index) => (
-                  <div key={index} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${item.active ? 'bg-gradient-to-br from-green-500 to-green-600 shadow shadow-green-500/30' : 'bg-gray-200'}`}>
-                        {item.active && <MdCheck className="w-2.5 h-2.5 text-white" />}
+                {timeline.map((item, index) => {
+                  const active = item.status !== '' && (
+                    item.status === 'open' ||
+                    (item.status === 'analysis' && (currentStatus === 'analysis' || currentStatus === 'resolved')) ||
+                    (item.status === 'resolved' && currentStatus === 'resolved')
+                  );
+                  return (
+                    <div key={index} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${active ? 'bg-gradient-to-br from-green-500 to-green-600 shadow shadow-green-500/30' : 'bg-gray-200'}`}>
+                          {active && <MdCheck className="w-2.5 h-2.5 text-white" />}
+                        </div>
+                        {index < timeline.length - 1 && (
+                          <div className={`w-0.5 h-8 ${active ? 'bg-green-500' : 'bg-gray-200'}`} />
+                        )}
                       </div>
-                      {index < mockReport.timeline.length - 1 && (
-                        <div className={`w-0.5 h-8 ${item.active ? 'bg-green-500' : 'bg-gray-200'}`} />
-                      )}
+                      <div className="flex-1 pb-2">
+                        <p className={`text-sm font-semibold ${active ? 'text-gray-900' : 'text-gray-400'}`}>{item.label}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 pb-2">
-                      <p className={`text-sm font-semibold ${item.active ? 'text-gray-900' : 'text-gray-400'}`}>{item.status}</p>
-                      <p className="text-xs text-gray-500">{item.date}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </motion.div>
           </div>
 
           {/* Mapa */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-xl shadow-sm overflow-hidden"
-          >
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-              <div className="p-1.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
-                <MdLocationOn className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-900">Localização no mapa</p>
-                <p className="text-xs text-gray-500">{mockReport.address}</p>
-              </div>
-            </div>
-            <div className="relative h-48">
-              <LeafletMap
-                center={[mockReport.lat, mockReport.lng]}
-                zoom={16}
-                markers={[{
-                  id: mockReport.id,
-                  lat: mockReport.lat,
-                  lng: mockReport.lng,
-                  color: '#EF4444',
-                  popupHtml: `<div style="font-family:sans-serif;font-size:13px"><strong>${mockReport.address}</strong></div>`,
-                } as MapMarker]}
-                className="absolute inset-0"
-              />
-            </div>
-          </motion.div>
-
-          {mockReport.comments.length > 0 && (
+          {complaint.lat && complaint.lng && (
             <motion.div
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="bg-white rounded-xl shadow-sm p-4"
+              transition={{ delay: 0.2 }}
+              className="bg-white rounded-xl shadow-sm overflow-hidden"
             >
-              <h3 className="font-bold mb-3 flex items-center gap-2 text-gray-900">
-                <MdMessage className="w-5 h-5 text-primary" />
-                Comentários da Equipe
-              </h3>
-              <div className="space-y-2">
-                {mockReport.comments.map((comment, index) => (
-                  <div key={index} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-100">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-gray-900">{comment.author}</p>
-                      <p className="text-[11px] text-gray-500">{comment.date}</p>
-                    </div>
-                    <p className="text-sm text-gray-700 leading-relaxed">{comment.text}</p>
-                  </div>
-                ))}
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+                <div className="p-1.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+                  <MdLocationOn className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Localização no mapa</p>
+                  <p className="text-xs text-gray-500">{complaint.address}</p>
+                </div>
+              </div>
+              <div className="relative h-48">
+                <LeafletMap
+                  center={[complaint.lat, complaint.lng]}
+                  zoom={16}
+                  markers={[{
+                    id: complaint.id,
+                    lat: complaint.lat,
+                    lng: complaint.lng,
+                    color: '#EF4444',
+                    popupHtml: `<div style="font-family:sans-serif;font-size:13px"><strong>${complaint.address}</strong></div>`,
+                  } as MapMarker]}
+                  className="absolute inset-0"
+                />
               </div>
             </motion.div>
           )}

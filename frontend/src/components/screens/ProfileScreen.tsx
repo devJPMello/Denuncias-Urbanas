@@ -60,7 +60,7 @@ function ProfileContent({ onBack, onSettingClick, onStatsClick, onLogout, user, 
   const contactItems = [
     ...(email ? [{ icon: MdEmail, color: 'from-blue-500 to-blue-600', label: 'E-mail', value: email }] : []),
     ...(phone ? [{ icon: MdPhone, color: 'from-green-500 to-green-600', label: 'Telefone', value: phone }] : []),
-    { icon: MdLocationOn, color: 'from-purple-500 to-purple-600', label: 'Cidade', value: 'São Paulo, SP' },
+    { icon: MdLocationOn, color: 'from-purple-500 to-purple-600', label: 'Cidade', value: 'Palmas, TO' },
   ];
 
   if (!isLoaded) {
