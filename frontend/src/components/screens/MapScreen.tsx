@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { MdSearch, MdAdd, MdList, MdPerson, MdFilterList, MdCamera, MdLocationOn, MdClose, MdMyLocation, MdPhoto, MdRefresh, MdGpsFixed } from 'react-icons/md';
 import { NotificationBell } from '../NotificationBell';
 import { CategoryType, CategoryChip } from '../CategoryChip';
@@ -33,10 +33,11 @@ interface MapScreenProps {
   onNewReport: () => void;
   onMyReports: () => void;
   onProfile: () => void;
+  autoOpenNewReport?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
+export function MapScreen({ onMyReports, onProfile, autoOpenNewReport }: MapScreenProps) {
   const [searchQuery, setSearchQuery]               = useState('');
   const [mobileSheet, setMobileSheet]               = useState<MobileSheetMode>('closed');
   const [selectedReport, setSelectedReport]         = useState<Complaint | null>(null);
@@ -61,6 +62,10 @@ export function MapScreen({ onMyReports, onProfile }: MapScreenProps) {
   const mapApiRef = useRef<LeafletMapApi | null>(null);
   const fileInputRef    = useRef<HTMLInputElement>(null);   // galeria / pasta
   const cameraInputRef  = useRef<HTMLInputElement>(null);   // câmera
+
+  useEffect(() => {
+    if (autoOpenNewReport) setShowNewReportModal(true);
+  }, []);
 
   const { complaints, isLoading } = useDenuncias();
   const { create, isLoading: isCreating, error: createError } = useCreateDenuncia();
