@@ -118,6 +118,7 @@ function ProfileRoute() {
       onBack={() => navigate('/map')}
       onSettingClick={(type) => navigate(`/settings/${type}`)}
       onStatsClick={() => navigate('/user-stats')}
+      onAdminPanel={() => navigate('/admin/login')}
     />
   );
 }

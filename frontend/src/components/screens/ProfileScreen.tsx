@@ -1,6 +1,6 @@
 import {
   MdArrowBack, MdPerson, MdNotifications, MdLanguage,
-  MdHelpOutline, MdChevronRight, MdLocationOn, MdBarChart,
+  MdHelpOutline, MdChevronRight, MdLocationOn, MdBarChart, MdAdminPanelSettings,
 } from 'react-icons/md';
 import { motion } from 'motion/react';
 
@@ -8,9 +8,10 @@ interface ProfileScreenProps {
   onBack:          () => void;
   onSettingClick?: (type: 'notifications' | 'language' | 'help') => void;
   onStatsClick?:   () => void;
+  onAdminPanel?:   () => void;
 }
 
-export function ProfileScreen({ onBack, onSettingClick, onStatsClick }: ProfileScreenProps) {
+export function ProfileScreen({ onBack, onSettingClick, onStatsClick, onAdminPanel }: ProfileScreenProps) {
   const menuItems = [
     { icon: MdNotifications, label: 'Notificações',    description: 'Gerenciar alertas e avisos',   color: 'from-blue-500 to-blue-600',   type: 'notifications' as const },
     { icon: MdLanguage,      label: 'Idioma',           description: 'Português (Brasil)',            color: 'from-green-500 to-green-600',  type: 'language'      as const },
@@ -122,6 +123,16 @@ export function ProfileScreen({ onBack, onSettingClick, onStatsClick }: ProfileS
             ))}
           </div>
         </motion.div>
+        {/* Acesso ao painel municipal */}
+        {onAdminPanel && (
+          <button
+            onClick={onAdminPanel}
+            className="w-full flex items-center justify-center gap-2 p-3 text-gray-400 hover:text-gray-600 transition-colors text-sm"
+          >
+            <MdAdminPanelSettings className="w-4 h-4" />
+            <span>Acessar Painel Municipal</span>
+          </button>
+        )}
       </div>
     </div>
   );
