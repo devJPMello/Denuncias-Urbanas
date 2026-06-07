@@ -32,11 +32,11 @@ export class PushService implements OnModuleInit {
   // ── Endpoints ─────────────────────────────────────────────────────────────
 
   /** Salva (ou atualiza) a subscription do dispositivo no banco. */
-  async saveSubscription(usuarioId: string, dto: SubscribeDto) {
+  async saveSubscription(dto: SubscribeDto, usuarioId?: string) {
     return this.prisma.pushSubscription.upsert({
       where:  { endpoint: dto.endpoint },
-      update: { p256dh: dto.keys.p256dh, auth: dto.keys.auth, usuarioId },
-      create: { endpoint: dto.endpoint, p256dh: dto.keys.p256dh, auth: dto.keys.auth, usuarioId },
+      update: { p256dh: dto.keys.p256dh, auth: dto.keys.auth, usuarioId: usuarioId ?? null },
+      create: { endpoint: dto.endpoint, p256dh: dto.keys.p256dh, auth: dto.keys.auth, usuarioId: usuarioId ?? null },
     });
   }
 

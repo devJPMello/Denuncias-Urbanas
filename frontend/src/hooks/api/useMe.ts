@@ -1,30 +1,24 @@
 /**
- * useMe — retorna o perfil do usuário autenticado (inclui role).
- * Usado para controle de acesso ao painel admin no frontend.
+ * useMe — retorna o perfil do admin autenticado (inclui role).
  */
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAdminAuth } from '../../lib/auth';
 import { api } from '../../services/api';
-import { CLERK_ENABLED } from '../../lib/auth';
 
 interface Me {
-  id:    string;
-  nome:  string;
+  sub:   string;
   email: string;
   role:  'cidadao' | 'admin';
 }
 
 export function useMe() {
-  const { getToken, isSignedIn } = useAuth();
+  const { token, isAuthenticated } = useAdminAuth();
 
   const { data, isLoading } = useQuery<Me>({
-    queryKey: ['me'],
-    queryFn:  async () => {
-      const token = CLERK_ENABLED ? await getToken() : null;
-      return api.get<Me>('/usuarios/me', token);
-    },
-    enabled:   !!isSignedIn,
-    staleTime: 5 * 60_000, // 5 min — role não muda com frequência
+    queryKey:  ['me'],
+    queryFn:   () => api.get<Me>('/auth/me', token),
+    enabled:   isAuthenticated,
+    staleTime: 5 * 60_000,
     retry:     1,
   });
 

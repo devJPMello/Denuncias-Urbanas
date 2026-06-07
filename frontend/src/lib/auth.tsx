@@ -1,41 +1,56 @@
-import { createContext, useContext, type ReactNode } from 'react';
-import { ClerkProvider, useAuth } from '@clerk/clerk-react';
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
-interface AuthState {
-  isSignedIn: boolean;
-  isLoaded: boolean;
+const STORAGE_KEY = 'admin_token';
+
+interface AdminAuthState {
+  token:              string | null;
+  isAuthenticated:    boolean;
+  mustChangePassword: boolean;
+  login:  (token: string, primeiroLogin: boolean) => void;
+  logout: () => void;
 }
 
-const AuthContext = createContext<AuthState>({ isSignedIn: false, isLoaded: true });
+const AdminAuthContext = createContext<AdminAuthState>({
+  token:              null,
+  isAuthenticated:    false,
+  mustChangePassword: false,
+  login:  () => {},
+  logout: () => {},
+});
 
-export const useAppAuth = () => useContext(AuthContext);
+export function useAdminAuth() {
+  return useContext(AdminAuthContext);
+}
 
-export const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-export const CLERK_ENABLED =
-  typeof CLERK_KEY === 'string' &&
-  CLERK_KEY.length > 20 &&
-  (CLERK_KEY.startsWith('pk_test_') || CLERK_KEY.startsWith('pk_live_'));
-
-function ClerkAuthSync({ children }: { children: ReactNode }) {
-  const { isSignedIn, isLoaded } = useAuth();
-  return (
-    <AuthContext.Provider value={{ isSignedIn: !!isSignedIn, isLoaded }}>
-      {children}
-    </AuthContext.Provider>
-  );
+export function getAdminToken(): string | null {
+  return localStorage.getItem(STORAGE_KEY);
 }
 
 export function AppAuthProvider({ children }: { children: ReactNode }) {
-  if (CLERK_ENABLED) {
-    return (
-      <ClerkProvider publishableKey={CLERK_KEY}>
-        <ClerkAuthSync>{children}</ClerkAuthSync>
-      </ClerkProvider>
-    );
-  }
+  const [token, setToken]                           = useState<string | null>(() => localStorage.getItem(STORAGE_KEY));
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+
+  const login = useCallback((newToken: string, primeiroLogin: boolean) => {
+    localStorage.setItem(STORAGE_KEY, newToken);
+    setToken(newToken);
+    setMustChangePassword(primeiroLogin);
+  }, []);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    setToken(null);
+    setMustChangePassword(false);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ isSignedIn: false, isLoaded: true }}>
+    <AdminAuthContext.Provider value={{
+      token,
+      isAuthenticated: !!token,
+      mustChangePassword,
+      login,
+      logout,
+    }}>
       {children}
-    </AuthContext.Provider>
+    </AdminAuthContext.Provider>
   );
 }

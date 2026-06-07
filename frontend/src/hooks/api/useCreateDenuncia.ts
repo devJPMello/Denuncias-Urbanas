@@ -1,11 +1,9 @@
 /**
- * useCreateDenuncia — envia nova denúncia (multipart se houver foto).
+ * useCreateDenuncia — envia nova denúncia anonimamente (multipart se houver foto).
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
 import { api } from '../../services/api';
 import { ApiDenuncia, Complaint, CreateDenunciaPayload, mapApiDenuncia } from '../../types';
-import { CLERK_ENABLED } from '../../lib/auth';
 
 interface UseCreateDenunciaResult {
   create:    (payload: CreateDenunciaPayload) => Promise<Complaint>;
@@ -16,29 +14,20 @@ interface UseCreateDenunciaResult {
 function buildFormData(payload: CreateDenunciaPayload): FormData {
   const { imagemFile, ...fields } = payload;
   const fd = new FormData();
-
-  if (imagemFile) {
-    fd.append('imagem', imagemFile);
-  }
-
+  if (imagemFile) fd.append('imagem', imagemFile);
   for (const [key, value] of Object.entries(fields)) {
-    if (value !== undefined && value !== null) {
-      fd.append(key, String(value));
-    }
+    if (value !== undefined && value !== null) fd.append(key, String(value));
   }
-
   return fd;
 }
 
 export function useCreateDenuncia(): UseCreateDenunciaResult {
-  const { getToken } = useAuth();
-  const queryClient  = useQueryClient();
+  const queryClient = useQueryClient();
 
   const { mutateAsync, isPending, error } = useMutation<ApiDenuncia, Error, CreateDenunciaPayload>({
     mutationFn: async (payload) => {
-      const token = CLERK_ENABLED ? await getToken() : null;
       const formData = buildFormData(payload);
-      return api.upload<ApiDenuncia>('/denuncias', formData, token);
+      return api.upload<ApiDenuncia>('/denuncias', formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['denuncias'] });

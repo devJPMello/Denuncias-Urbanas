@@ -1,17 +1,30 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { ClerkAuthGuard } from './guards/clerk-auth.guard';
-import { CurrentUser } from './decorators/current-user.decorator';
-import { Usuario } from '@prisma/client';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  /** Retorna os dados do usuário autenticado (útil para debug / profile). */
+  @Post('login')
+  login(@Body() body: { email: string; senha: string }) {
+    return this.authService.login(body.email, body.senha);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  changePassword(
+    @Req() req: Request,
+    @Body() body: { novaSenha: string },
+  ) {
+    const user = req['user'] as { sub: string };
+    return this.authService.changePassword(user.sub, body.novaSenha);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('me')
-  @UseGuards(ClerkAuthGuard)
-  me(@CurrentUser() user: Usuario) {
-    return this.authService.me(user);
+  me(@Req() req: Request) {
+    return this.authService.me(req['user'] as { sub: string; email: string; role: string });
   }
 }

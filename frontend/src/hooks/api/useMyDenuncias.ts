@@ -1,11 +1,9 @@
 /**
- * useMyDenuncias — denúncias do usuário autenticado via TanStack Query.
+ * useMyDenuncias — todas as denúncias registradas (acesso público).
  */
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
 import { api } from '../../services/api';
 import { ApiDenuncia, Complaint, mapApiDenuncia } from '../../types';
-import { CLERK_ENABLED } from '../../lib/auth';
 
 interface UseMyDenunciasResult {
   complaints: Complaint[];
@@ -15,15 +13,9 @@ interface UseMyDenunciasResult {
 }
 
 export function useMyDenuncias(): UseMyDenunciasResult {
-  const { getToken, isSignedIn } = useAuth();
-
   const { data = [], isLoading, error } = useQuery<ApiDenuncia[]>({
     queryKey: ['my-denuncias'],
-    queryFn:  async () => {
-      const token = CLERK_ENABLED ? await getToken() : null;
-      return api.get<ApiDenuncia[]>('/denuncias/mine', token);
-    },
-    enabled:   !!isSignedIn,
+    queryFn:  () => api.get<ApiDenuncia[]>('/denuncias'),
     staleTime: 30_000,
     retry:     1,
   });

@@ -1,75 +1,27 @@
-import { useUser, useClerk } from '@clerk/clerk-react';
-import { CLERK_ENABLED } from '../../lib/auth';
-
-type ClerkUser = NonNullable<ReturnType<typeof useUser>['user']>;
-import { MdArrowBack, MdPerson, MdEmail, MdNotifications, MdLanguage, MdHelpOutline, MdLogout, MdChevronRight, MdPhone, MdLocationOn, MdBarChart } from 'react-icons/md';
+import {
+  MdArrowBack, MdPerson, MdNotifications, MdLanguage,
+  MdHelpOutline, MdChevronRight, MdLocationOn, MdBarChart,
+} from 'react-icons/md';
 import { motion } from 'motion/react';
 
 interface ProfileScreenProps {
-  onBack: () => void;
+  onBack:          () => void;
   onSettingClick?: (type: 'notifications' | 'language' | 'help') => void;
-  onStatsClick?: () => void;
-  onLogout?: () => void;
+  onStatsClick?:   () => void;
 }
 
-function ProfileWithClerk({ onBack, onSettingClick, onStatsClick, onLogout }: ProfileScreenProps) {
-  const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
-  return <ProfileContent onBack={onBack} onSettingClick={onSettingClick} onStatsClick={onStatsClick} onLogout={onLogout} user={user ?? null} isLoaded={isLoaded} signOut={signOut} />;
-}
-
-function ProfileWithoutClerk({ onBack, onSettingClick, onStatsClick, onLogout }: ProfileScreenProps) {
-  return <ProfileContent onBack={onBack} onSettingClick={onSettingClick} onStatsClick={onStatsClick} onLogout={onLogout} user={null} isLoaded={true} signOut={async () => {}} />;
-}
-
-export function ProfileScreen(props: ProfileScreenProps) {
-  return CLERK_ENABLED ? <ProfileWithClerk {...props} /> : <ProfileWithoutClerk {...props} />;
-}
-
-interface ProfileContentProps extends ProfileScreenProps {
-  user: ClerkUser | null;
-  isLoaded: boolean;
-  signOut: () => Promise<void>;
-}
-
-function ProfileContent({ onBack, onSettingClick, onStatsClick, onLogout, user, isLoaded, signOut }: ProfileContentProps) {
-  const handleLogout = async () => {
-    await signOut();
-    onLogout?.();
-  };
-
-  const displayName = user?.fullName || user?.firstName || 'Usuário';
-  const email = user?.emailAddresses[0]?.emailAddress ?? '';
-  const phone = user?.phoneNumbers[0]?.phoneNumber ?? null;
-  const memberSince = user?.createdAt
-    ? new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(user.createdAt))
-    : null;
-
+export function ProfileScreen({ onBack, onSettingClick, onStatsClick }: ProfileScreenProps) {
   const menuItems = [
-    { icon: MdNotifications, label: 'Notificações', description: 'Gerenciar alertas e avisos', color: 'from-blue-500 to-blue-600', type: 'notifications' as const },
-    { icon: MdLanguage, label: 'Idioma', description: 'Português (Brasil)', color: 'from-green-500 to-green-600', type: 'language' as const },
-    { icon: MdHelpOutline, label: 'Ajuda e Suporte', description: 'Central de ajuda', color: 'from-purple-500 to-purple-600', type: 'help' as const },
+    { icon: MdNotifications, label: 'Notificações',    description: 'Gerenciar alertas e avisos',   color: 'from-blue-500 to-blue-600',   type: 'notifications' as const },
+    { icon: MdLanguage,      label: 'Idioma',           description: 'Português (Brasil)',            color: 'from-green-500 to-green-600',  type: 'language'      as const },
+    { icon: MdHelpOutline,   label: 'Ajuda e Suporte',  description: 'Central de ajuda',              color: 'from-purple-500 to-purple-600', type: 'help'         as const },
   ];
 
   const stats = [
-    { value: '12', label: 'Denúncias', gradient: 'from-blue-500 to-blue-600' },
-    { value: '8', label: 'Em andamento', gradient: 'from-amber-500 to-amber-600' },
-    { value: '4', label: 'Resolvidas', gradient: 'from-green-500 to-green-600' },
+    { value: '12', label: 'Denúncias',     gradient: 'from-blue-500 to-blue-600' },
+    { value: '8',  label: 'Em andamento',  gradient: 'from-amber-500 to-amber-600' },
+    { value: '4',  label: 'Resolvidas',    gradient: 'from-green-500 to-green-600' },
   ];
-
-  const contactItems = [
-    ...(email ? [{ icon: MdEmail, color: 'from-blue-500 to-blue-600', label: 'E-mail', value: email }] : []),
-    ...(phone ? [{ icon: MdPhone, color: 'from-green-500 to-green-600', label: 'Telefone', value: phone }] : []),
-    { icon: MdLocationOn, color: 'from-purple-500 to-purple-600', label: 'Cidade', value: 'Palmas, TO' },
-  ];
-
-  if (!isLoaded) {
-    return (
-      <div className="h-full flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="h-full flex flex-col bg-background overflow-y-auto">
@@ -81,35 +33,25 @@ function ProfileContent({ onBack, onSettingClick, onStatsClick, onLogout, user, 
             </button>
             <div className="flex-1">
               <h2 className="font-bold">Meu Perfil</h2>
-              <p className="text-white/80 text-xs">Gerencie suas informações</p>
+              <p className="text-white/80 text-xs">Configurações e preferências</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="flex-1 p-4 max-w-5xl mx-auto w-full space-y-3">
-        {/* Card do usuário */}
+        {/* Card do cidadão */}
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-4">
-            <div className="relative flex-shrink-0">
-              {user?.imageUrl ? (
-                <img
-                  src={user.imageUrl}
-                  alt={displayName}
-                  className="w-16 h-16 rounded-2xl object-cover shadow-md"
-                />
-              ) : (
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/30">
-                  <MdPerson className="w-8 h-8 text-white" />
-                </div>
-              )}
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/30 flex-shrink-0">
+              <MdPerson className="w-8 h-8 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="font-bold text-gray-900 truncate">{displayName}</h2>
-              <p className="text-xs text-gray-500">Cidadão Participativo</p>
-              {memberSince && (
-                <p className="text-xs text-gray-400 mt-0.5">Membro desde {memberSince}</p>
-              )}
+              <h2 className="font-bold text-gray-900">Cidadão Participativo</h2>
+              <div className="flex items-center gap-1.5 mt-1">
+                <MdLocationOn className="w-4 h-4 text-gray-400" />
+                <p className="text-xs text-gray-500">Palmas, TO</p>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -151,67 +93,35 @@ function ProfileContent({ onBack, onSettingClick, onStatsClick, onLogout, user, 
           <MdChevronRight className="w-5 h-5" />
         </motion.button>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          {/* Informações de contato */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-xl shadow-sm p-4 space-y-3"
-          >
-            <h3 className="font-bold text-gray-900">Informações de Contato</h3>
-            {contactItems.map((item, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className={`p-2 bg-gradient-to-br ${item.color} rounded-lg`}>
+        {/* Configurações */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="bg-white rounded-xl shadow-sm overflow-hidden"
+        >
+          <div className="px-4 pt-4 pb-2">
+            <h3 className="font-bold text-gray-900">Configurações</h3>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {menuItems.map((item, i) => (
+              <button
+                key={i}
+                onClick={() => onSettingClick?.(item.type)}
+                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors"
+              >
+                <div className={`p-2 bg-gradient-to-br ${item.color} rounded-lg shadow-sm`}>
                   <item.icon className="w-4 h-4 text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-500">{item.label}</p>
-                  <p className="text-sm font-semibold text-gray-900 truncate">{item.value}</p>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{item.label}</p>
+                  <p className="text-xs text-gray-500 truncate">{item.description}</p>
                 </div>
-              </div>
+                <MdChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </button>
             ))}
-          </motion.div>
-
-          {/* Configurações */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-xl shadow-sm overflow-hidden"
-          >
-            <div className="px-4 pt-4 pb-2">
-              <h3 className="font-bold text-gray-900">Configurações</h3>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {menuItems.map((item, i) => (
-                <button
-                  key={i}
-                  onClick={() => onSettingClick?.(item.type)}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors"
-                >
-                  <div className={`p-2 bg-gradient-to-br ${item.color} rounded-lg shadow-sm`}>
-                    <item.icon className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{item.label}</p>
-                    <p className="text-xs text-gray-500 truncate">{item.description}</p>
-                  </div>
-                  <MdChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Botão sair */}
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl shadow-md hover:shadow-lg transition-all"
-        >
-          <MdLogout className="w-5 h-5" />
-          <span className="text-sm font-semibold">Sair da Conta</span>
-        </button>
+          </div>
+        </motion.div>
       </div>
     </div>
   );
