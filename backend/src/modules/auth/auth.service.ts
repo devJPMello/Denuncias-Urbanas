@@ -11,14 +11,19 @@ export class AuthService {
   ) {}
 
   async login(email: string, senha: string) {
+    console.log('[AUTH] login attempt:', { email, senhaLen: senha?.length });
+
     if (!email.toLowerCase().endsWith('@denunurban.com')) {
+      console.log('[AUTH] domain check failed');
       throw new UnauthorizedException('Acesso restrito a contas @denunUrban.com');
     }
 
     const user = await this.usuariosService.findByEmail(email);
+    console.log('[AUTH] user found:', !!user, user?.email);
     if (!user) throw new UnauthorizedException('Credenciais inválidas');
 
     const match = await bcrypt.compare(senha, user.senha);
+    console.log('[AUTH] password match:', match);
     if (!match) throw new UnauthorizedException('Credenciais inválidas');
 
     const token = await this.jwtService.signAsync({

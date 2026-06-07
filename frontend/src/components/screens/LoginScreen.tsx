@@ -31,7 +31,7 @@ export function AdminLoginScreen({ onBack, onLogin }: AdminLoginScreenProps) {
       login(res.token, res.primeiroLogin);
       onLogin();
     } catch (err) {
-      setError('E-mail ou senha inválidos.');
+      setError(err instanceof Error ? err.message : 'E-mail ou senha inválidos.');
     } finally {
       setLoading(false);
     }
