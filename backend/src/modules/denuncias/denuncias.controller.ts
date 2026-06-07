@@ -8,9 +8,7 @@ import type { Response } from 'express';
 import { DenunciasService } from './denuncias.service';
 import { CreateDenunciaDto } from './dto/create-denuncia.dto';
 import { UpdateDenunciaDto } from './dto/update-denuncia.dto';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import type { Usuario } from '@prisma/client';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -29,14 +27,6 @@ export class DenunciasController {
     });
   }
 
-  @UseGuards(ClerkAuthGuard)
-  @Get('mine')
-  findMine(@CurrentUser() user: Usuario) {
-    return this.denunciasService.findByAutorId(user.id);
-  }
-
-  /** Preview de coordenadas a partir do endereço (evita CORS no browser). */
-  @UseGuards(ClerkAuthGuard)
   @Get('geocode-preview')
   async geocodePreview(@Query('address') address: string) {
     if (!address?.trim()) {
@@ -59,7 +49,7 @@ export class DenunciasController {
     return this.denunciasService.findOne(id);
   }
 
-  @UseGuards(ClerkAuthGuard)
+  /** Criação anônima — cidadão não precisa de login. */
   @Post()
   @UseInterceptors(
     FileInterceptor('imagem', {
@@ -76,21 +66,24 @@ export class DenunciasController {
   create(
     @Body() dto: CreateDenunciaDto,
     @UploadedFile() file: Express.Multer.File | undefined,
-    @CurrentUser() user: Usuario,
   ) {
     return this.denunciasService.create({
       ...dto,
-      autorId: user.id,
+      autorId:     undefined,
       imagemBytes: file?.buffer,
       imagemMime:  file?.mimetype,
     });
   }
 
+  /** Atualização de status — apenas painel municipal autenticado. */
+  @UseGuards(JwtAuthGuard)
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateDenunciaDto) {
     return this.denunciasService.update(id, dto);
   }
 
+  /** Remoção — apenas painel municipal autenticado. */
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.denunciasService.remove(id);

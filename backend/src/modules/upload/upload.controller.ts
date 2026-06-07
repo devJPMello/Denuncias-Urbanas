@@ -10,16 +10,15 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 const UPLOAD_DIR = join(__dirname, '..', '..', '..', 'uploads');
 
-// Garante que o diretório existe no momento em que o módulo carrega
 if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
 
 @Controller('upload')
 export class UploadController {
-  @UseGuards(ClerkAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
@@ -30,7 +29,7 @@ export class UploadController {
           cb(null, `${unique}${extname(file.originalname)}`);
         },
       }),
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.startsWith('image/')) {
           return cb(new BadRequestException('Apenas imagens são permitidas'), false);

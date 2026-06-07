@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UsuariosService {
@@ -12,18 +12,15 @@ export class UsuariosService {
     return usuario;
   }
 
-  findByClerkId(clerkId: string) {
-    return this.prisma.usuario.findUnique({ where: { clerkId } });
+  findByEmail(email: string) {
+    return this.prisma.usuario.findUnique({ where: { email } });
   }
 
-  create(dto: CreateUsuarioDto) {
-    return this.prisma.usuario.create({ data: dto });
+  create(data: Prisma.UsuarioCreateInput) {
+    return this.prisma.usuario.create({ data });
   }
 
-  /** Retorna o usuário existente ou cria um novo na primeira autenticação. */
-  async findOrCreate(dto: CreateUsuarioDto) {
-    const existing = await this.findByClerkId(dto.clerkId);
-    if (existing) return existing;
-    return this.create(dto);
+  update(id: string, data: Prisma.UsuarioUpdateInput) {
+    return this.prisma.usuario.update({ where: { id }, data });
   }
 }

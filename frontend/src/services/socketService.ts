@@ -66,6 +66,11 @@ class ManagedSocket {
     this.createSocket({ token });
   }
 
+  connectAnonymous(): void {
+    if (this.socket?.connected) return;
+    this.createSocket({});
+  }
+
   connectMunicipalPanel(): void {
     if (this.socket?.connected) return;
     this.createSocket({ mode: 'municipal-panel' });

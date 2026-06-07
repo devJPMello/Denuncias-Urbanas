@@ -10,8 +10,6 @@ import { Textarea } from '../Textarea';
 import { motion } from 'motion/react';
 import { useDenuncias } from '../../hooks/api/useDenuncias';
 import { useCreateDenuncia } from '../../hooks/api/useCreateDenuncia';
-import { useAuth } from '@clerk/clerk-react';
-import { CLERK_ENABLED } from '../../lib/auth';
 import { forwardGeocode, reverseGeocode } from '../../lib/geocode';
 import { MobileOccurrenceSheet, type MobileSheetMode } from '../MobileOccurrenceSheet';
 import type { Complaint } from '../../types';
@@ -69,7 +67,6 @@ export function MapScreen({ onMyReports, onProfile, autoOpenNewReport }: MapScre
 
   const { complaints, isLoading } = useDenuncias();
   const { create, isLoading: isCreating, error: createError } = useCreateDenuncia();
-  const { getToken, isSignedIn } = useAuth();
 
   const filteredReports = complaints.filter(r =>
     !searchQuery || r.address.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -124,8 +121,7 @@ export function MapScreen({ onMyReports, onProfile, autoOpenNewReport }: MapScre
     setLocError(null);
     setPinAdjusted(false);
     try {
-      const token = CLERK_ENABLED ? await getToken() : null;
-      const coords = await forwardGeocode(trimmed, token);
+      const coords = await forwardGeocode(trimmed, null);
       if (!coords) {
         setLocError('Endereço não encontrado. Use o mapa abaixo para posicionar o pin.');
         return;
@@ -185,10 +181,6 @@ export function MapScreen({ onMyReports, onProfile, autoOpenNewReport }: MapScre
 
   const handleSubmit = async () => {
     if (!selectedCategory) return;
-    if (CLERK_ENABLED && !isSignedIn) {
-      return;
-    }
-
     try {
       if (!imageFile) {
         throw new Error('Adicione uma foto da denúncia.');
@@ -540,11 +532,6 @@ export function MapScreen({ onMyReports, onProfile, autoOpenNewReport }: MapScre
               </div>
             ) : null}
 
-            {CLERK_ENABLED && !isSignedIn && (
-              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                Faça login para enviar uma denúncia.
-              </p>
-            )}
             {createError && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
                 {createError}
@@ -561,8 +548,7 @@ export function MapScreen({ onMyReports, onProfile, autoOpenNewReport }: MapScre
                 !locAddress ||
                 !locCoords ||
                 isCreating ||
-                geocodeLoading ||
-                (CLERK_ENABLED && !isSignedIn)
+                geocodeLoading
               }
             >
               {geocodeLoading ? 'Localizando endereço...' : isCreating ? 'Enviando...' : 'Enviar Denúncia'}

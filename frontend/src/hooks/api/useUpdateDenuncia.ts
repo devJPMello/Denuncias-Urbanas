@@ -1,11 +1,10 @@
 /**
- * useUpdateDenuncia — atualiza denúncia (admin) via TanStack Query mutation.
+ * useUpdateDenuncia — atualiza denúncia (admin) via JWT.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAdminAuth } from '../../lib/auth';
 import { api } from '../../services/api';
 import { ApiDenuncia, Complaint, UpdateDenunciaPayload, mapApiDenuncia } from '../../types';
-import { CLERK_ENABLED } from '../../lib/auth';
 
 interface UseUpdateDenunciaResult {
   update:    (id: string, payload: UpdateDenunciaPayload) => Promise<Complaint>;
@@ -14,18 +13,16 @@ interface UseUpdateDenunciaResult {
 }
 
 export function useUpdateDenuncia(): UseUpdateDenunciaResult {
-  const { getToken } = useAuth();
-  const queryClient  = useQueryClient();
+  const { token }   = useAdminAuth();
+  const queryClient = useQueryClient();
 
   const { mutateAsync, isPending, error } = useMutation<
     ApiDenuncia,
     Error,
     { id: string; payload: UpdateDenunciaPayload }
   >({
-    mutationFn: async ({ id, payload }) => {
-      const token = CLERK_ENABLED ? await getToken() : null;
-      return api.put<ApiDenuncia>(`/denuncias/${id}`, payload, token);
-    },
+    mutationFn: async ({ id, payload }) =>
+      api.put<ApiDenuncia>(`/denuncias/${id}`, payload, token),
     onSuccess: (_data, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['denuncias'] });
       queryClient.invalidateQueries({ queryKey: ['denuncias', id] });

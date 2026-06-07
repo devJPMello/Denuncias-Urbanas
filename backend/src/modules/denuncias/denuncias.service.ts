@@ -122,7 +122,7 @@ export class DenunciasService {
     return null;
   }
 
-  async create(dto: CreateDenunciaDto & { autorId: string }): Promise<DenunciaPublica> {
+  async create(dto: CreateDenunciaDto & { autorId?: string }): Promise<DenunciaPublica> {
     const coords = await this.resolveCoordinates(dto.endereco, dto.lat, dto.lng);
 
     const denuncia = await this.prisma.denuncia.create({
@@ -133,7 +133,7 @@ export class DenunciasService {
         endereco:    dto.endereco,
         lat:         coords.lat,
         lng:         coords.lng,
-        autorId:     dto.autorId,
+        autorId:     dto.autorId ?? null,
         imagemBytes: dto.imagemBytes,
         imagemMime:  dto.imagemMime,
         imagemUrl:   null,
@@ -142,7 +142,7 @@ export class DenunciasService {
     });
 
     this.notifications.emitComplaintCreated(denuncia.id);
-    await this.notifyCitizenRegistered(denuncia);
+    if (denuncia.autorId) await this.notifyCitizenRegistered(denuncia as { id: string; titulo: string; autorId: string; criadoEm: Date });
 
     return mapDenunciaPublica(denuncia);
   }
@@ -157,8 +157,8 @@ export class DenunciasService {
       include: DENUNCIA_LIST_INCLUDE,
     });
 
-    if (dto.status && dto.status !== before.status) {
-      await this.notifyCitizenOnStatusChange(updated, dto.status);
+    if (dto.status && dto.status !== before.status && updated.autorId) {
+      await this.notifyCitizenOnStatusChange(updated as { id: string; titulo: string; autorId: string; status: StatusDenuncia; atualizadoEm: Date }, dto.status);
     }
 
     return mapDenunciaPublica({ ...updated, imagemBytes: null });

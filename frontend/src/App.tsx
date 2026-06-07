@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ErrorBoundary } from 'react-error-boundary';
-import { useAppAuth } from './lib/auth';
-import { SplashScreen }       from './components/screens/SplashScreen';
-import { LoginScreen }        from './components/screens/LoginScreen';
+import { useAdminAuth } from './lib/auth';
+import { SplashScreen }            from './components/screens/SplashScreen';
+import { AdminLoginScreen,
+         AdminChangePasswordScreen } from './components/screens/LoginScreen';
 import { MapScreen }          from './components/screens/MapScreen';
 import { MyReportsScreen }    from './components/screens/MyReportsScreen';
 import { ReportDetailScreen } from './components/screens/ReportDetailScreen';
@@ -18,42 +19,55 @@ import { ErrorFallback }      from './components/ErrorFallback';
 
 type SettingType = 'notifications' | 'language' | 'help';
 
-// ── Auth-aware root redirect ──────────────────────────────────────────────────
+// ── Admin route guard ─────────────────────────────────────────────────────────
 
-function RootRedirect() {
-  const { isSignedIn, isLoaded } = useAppAuth();
-  if (!isLoaded) return null;
-  return <Navigate to={isSignedIn ? '/map' : '/splash'} replace />;
+function AdminRoute() {
+  const { isAuthenticated, mustChangePassword, logout } = useAdminAuth();
+  const navigate = useNavigate();
+
+  if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
+  if (mustChangePassword) return <Navigate to="/admin/change-password" replace />;
+
+  return <AdminPanelScreen onLogout={() => { logout(); navigate('/admin/login', { replace: true }); }} />;
 }
 
 // ── Route components ──────────────────────────────────────────────────────────
 
 function SplashRoute() {
   const navigate = useNavigate();
-  const { isSignedIn, isLoaded } = useAppAuth();
-
-  useEffect(() => {
-    if (isLoaded && isSignedIn) navigate('/map', { replace: true });
-  }, [isLoaded, isSignedIn, navigate]);
-
   return (
     <SplashScreen
-      onLogin={() => navigate('/login')}
-      onRegister={() => navigate('/login')}
-      onAdmin={() => navigate('/admin')}
+      onLogin={() => navigate('/map')}
+      onRegister={() => navigate('/map')}
+      onAdmin={() => navigate('/admin/login')}
     />
   );
 }
 
-function LoginRoute() {
+function AdminLoginRoute() {
   const navigate = useNavigate();
+  const { isAuthenticated, mustChangePassword } = useAdminAuth();
+
+  useEffect(() => {
+    if (isAuthenticated && !mustChangePassword) navigate('/admin', { replace: true });
+    if (isAuthenticated && mustChangePassword) navigate('/admin/change-password', { replace: true });
+  }, [isAuthenticated, mustChangePassword, navigate]);
+
   return (
-    <LoginScreen
+    <AdminLoginScreen
       onBack={() => navigate('/splash')}
-      onLogin={() => navigate('/map', { replace: true })}
-      onAnonymous={() => navigate('/map', { replace: true })}
+      onLogin={() => {
+        /* handled by useEffect above */
+      }}
     />
   );
+}
+
+function AdminChangePasswordRoute() {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAdminAuth();
+  if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
+  return <AdminChangePasswordScreen onSuccess={() => navigate('/admin', { replace: true })} />;
 }
 
 function MapRoute() {
@@ -97,11 +111,6 @@ function ReportDetailRoute() {
   );
 }
 
-function AdminRoute() {
-  const navigate = useNavigate();
-  return <AdminPanelScreen onLogout={() => navigate('/login')} />;
-}
-
 function ProfileRoute() {
   const navigate = useNavigate();
   return (
@@ -109,7 +118,6 @@ function ProfileRoute() {
       onBack={() => navigate('/map')}
       onSettingClick={(type) => navigate(`/settings/${type}`)}
       onStatsClick={() => navigate('/user-stats')}
-      onLogout={() => navigate('/splash')}
     />
   );
 }
@@ -140,17 +148,18 @@ export default function App() {
         onReset={() => window.location.replace('/')}
       >
         <Routes>
-          <Route path="/"               element={<RootRedirect />} />
-          <Route path="/splash"         element={<SplashRoute />} />
-          <Route path="/login"          element={<LoginRoute />} />
-          <Route path="/map"            element={<MapRoute />} />
-          <Route path="/my-reports"     element={<MyReportsRoute />} />
-          <Route path="/report/:id"     element={<ReportDetailRoute />} />
-          <Route path="/admin"          element={<AdminRoute />} />
-          <Route path="/profile"        element={<ProfileRoute />} />
-          <Route path="/settings/:type" element={<SettingsRoute />} />
-          <Route path="/user-stats"     element={<UserStatsRoute />} />
-          <Route path="*"               element={<Navigate to="/" replace />} />
+          <Route path="/"                       element={<Navigate to="/map" replace />} />
+          <Route path="/splash"                 element={<SplashRoute />} />
+          <Route path="/map"                    element={<MapRoute />} />
+          <Route path="/my-reports"             element={<MyReportsRoute />} />
+          <Route path="/report/:id"             element={<ReportDetailRoute />} />
+          <Route path="/admin"                  element={<AdminRoute />} />
+          <Route path="/admin/login"            element={<AdminLoginRoute />} />
+          <Route path="/admin/change-password" element={<AdminChangePasswordRoute />} />
+          <Route path="/profile"                element={<ProfileRoute />} />
+          <Route path="/settings/:type"         element={<SettingsRoute />} />
+          <Route path="/user-stats"             element={<UserStatsRoute />} />
+          <Route path="*"                       element={<Navigate to="/map" replace />} />
         </Routes>
       </ErrorBoundary>
       <UpdatePrompt />

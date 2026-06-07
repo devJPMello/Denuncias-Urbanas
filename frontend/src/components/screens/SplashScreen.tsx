@@ -106,7 +106,7 @@ export function SplashScreen({ onLogin, onAdmin }: SplashScreenProps) {
               className="w-full bg-white text-primary hover:bg-white/95 shadow-xl font-bold"
               onClick={onLogin}
             >
-              Entrar na conta
+              Acessar o Mapa
             </Button>
           </motion.div>
 
