@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body } from '@nestjs/common';
 import { PushService } from './push.service';
-import { SubscribeDto } from './dto/subscribe.dto';
+import { SubscribeDto, SubscribeDenunciaDto } from './dto/subscribe.dto';
 import { UnsubscribeDto } from './dto/unsubscribe.dto';
 
 @Controller('push')
@@ -15,6 +15,12 @@ export class PushController {
   @Post('subscribe')
   subscribe(@Body() dto: SubscribeDto) {
     return this.pushService.saveSubscription(dto);
+  }
+
+  @Post('subscribe-denuncia')
+  subscribeDenuncia(@Body() dto: SubscribeDenunciaDto) {
+    if (!dto.denunciaId) return this.pushService.saveSubscription(dto);
+    return this.pushService.saveSubscriptionForDenuncia(dto, dto.denunciaId);
   }
 
   @Post('unsubscribe')

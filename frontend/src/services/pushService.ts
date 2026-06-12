@@ -97,3 +97,27 @@ export async function getSubscription(): Promise<PushSubscription | null> {
   const registration = await navigator.serviceWorker.ready;
   return registration.pushManager.getSubscription();
 }
+
+/**
+ * Registers the device for push notifications linked to a specific anonymous
+ * complaint. Requests permission if not yet granted. Safe to call multiple
+ * times for the same complaint (backend upserts the link).
+ */
+export async function subscribeDenuncia(denunciaId: string): Promise<void> {
+  if (!isPushSupported() || !VAPID_PUBLIC_KEY) return;
+
+  const perm = await requestPermission();
+  if (perm !== 'granted') return;
+
+  const registration = await navigator.serviceWorker.ready;
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly:      true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  }
+
+  await api.post('/push/subscribe-denuncia', { ...subscription.toJSON(), denunciaId }, null);
+}

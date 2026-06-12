@@ -71,18 +71,37 @@ self.addEventListener('push', (event) => {
     tag?: string;
     url?: string;
     icon?: string;
+    denunciaId?: string;
   } | undefined;
 
-  const title = data?.title ?? data?.titulo ?? 'Denúncias Urbanas';
-  const options: NotificationOptions = {
-    body: data?.body ?? data?.mensagem ?? 'Você tem uma nova notificação.',
-    icon: data?.icon ?? '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
-    tag: data?.tag ?? 'denuncias-urbanas',
-    data: { url: data?.url ?? '/' },
-  };
+  const title = data?.title ?? 'Denúncias Urbanas';
+  const body  = data?.body  ?? 'Você tem uma nova notificação.';
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      // Avisa todas as abas abertas para atualizar o sino
+      for (const client of clients) {
+        client.postMessage({
+          type:       'PUSH_NOTIFICATION',
+          title,
+          body,
+          denunciaId: data?.denunciaId ?? '',
+        });
+      }
+
+      // Só mostra notificação do OS se o app não estiver visível
+      const appVisivel = clients.some((c) => c.visibilityState === 'visible');
+      if (appVisivel) return;
+
+      return self.registration.showNotification(title, {
+        body,
+        icon:  data?.icon ?? '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        tag:   data?.tag  ?? 'denuncias-urbanas',
+        data:  { url: data?.url ?? '/', denunciaId: data?.denunciaId },
+      });
+    }),
+  );
 });
 
 // ── Notification click ────────────────────────────────────────────────────────

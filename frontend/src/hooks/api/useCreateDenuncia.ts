@@ -3,6 +3,7 @@
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
+import { subscribeDenuncia } from '../../services/pushService';
 import { ApiDenuncia, Complaint, CreateDenunciaPayload, mapApiDenuncia } from '../../types';
 
 interface UseCreateDenunciaResult {
@@ -29,9 +30,11 @@ export function useCreateDenuncia(): UseCreateDenunciaResult {
       const formData = buildFormData(payload);
       return api.upload<ApiDenuncia>('/denuncias', formData);
     },
-    onSuccess: () => {
+    onSuccess: (denuncia) => {
       queryClient.invalidateQueries({ queryKey: ['denuncias'] });
       queryClient.invalidateQueries({ queryKey: ['my-denuncias'] });
+      // Registra push para receber notificações sobre este chamado anônimo
+      subscribeDenuncia(denuncia.id).catch(() => {});
     },
   });
 

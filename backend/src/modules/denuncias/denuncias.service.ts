@@ -157,8 +157,12 @@ export class DenunciasService {
       include: DENUNCIA_LIST_INCLUDE,
     });
 
-    if (dto.status && dto.status !== before.status && updated.autorId) {
-      await this.notifyCitizenOnStatusChange(updated as { id: string; titulo: string; autorId: string; status: StatusDenuncia; atualizadoEm: Date }, dto.status);
+    if (dto.status && dto.status !== before.status) {
+      if (updated.autorId) {
+        await this.notifyCitizenOnStatusChange(updated as { id: string; titulo: string; autorId: string; status: StatusDenuncia; atualizadoEm: Date }, dto.status);
+      } else {
+        await this.notifyAnonymousOnStatusChange(updated as { id: string; titulo: string; status: StatusDenuncia; atualizadoEm: Date }, dto.status);
+      }
     }
 
     return mapDenunciaPublica({ ...updated, imagemBytes: null });
@@ -253,6 +257,36 @@ export class DenunciasService {
     };
 
     this.enqueuePush(pushPayload);
+  }
+
+  /** Push para denúncia anônima quando o status muda. */
+  private async notifyAnonymousOnStatusChange(
+    denuncia: { id: string; titulo: string; status: StatusDenuncia; atualizadoEm: Date },
+    status: StatusDenuncia,
+  ): Promise<void> {
+    const messages: Partial<Record<StatusDenuncia, { title: string; body: string }>> = {
+      resolvido: {
+        title: '✅ Denúncia resolvida',
+        body:  `Sua denúncia "${denuncia.titulo}" foi concluída pela equipe municipal.`,
+      },
+      cancelado: {
+        title: 'Denúncia encerrada',
+        body:  `Sua denúncia "${denuncia.titulo}" foi encerrada.`,
+      },
+      analise: {
+        title: '📋 Denúncia em análise',
+        body:  `Sua denúncia "${denuncia.titulo}" está em análise.`,
+      },
+      aberto: {
+        title: 'Denúncia reaberta',
+        body:  `Sua denúncia "${denuncia.titulo}" voltou para a fila.`,
+      },
+    };
+
+    const msg = messages[status];
+    if (!msg) return;
+
+    this.enqueuePush({ denunciaId: denuncia.id, titulo: msg.title, mensagem: msg.body, url: '/' });
   }
 
   /** Push em background — não bloqueia a API (sino usa WebSocket imediato). */

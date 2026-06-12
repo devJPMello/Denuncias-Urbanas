@@ -45,6 +45,29 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe<NotificationNewPayload>('notification:new', handler);
   }, [subscribe, unsubscribe]);
 
+  // Recebe pushes repassados pelo service worker para atualizar o sino
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type !== 'PUSH_NOTIFICATION') return;
+      setNotifications(prev => [
+        {
+          id:         crypto.randomUUID(),
+          title:      event.data.title  ?? '',
+          body:       event.data.body   ?? '',
+          denunciaId: event.data.denunciaId ?? '',
+          receivedAt: new Date(),
+          read:       false,
+        },
+        ...prev,
+      ].slice(0, 50));
+    };
+
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, []);
+
   const clearAll = useCallback(() => setNotifications([]), []);
 
   const markAllRead = useCallback(

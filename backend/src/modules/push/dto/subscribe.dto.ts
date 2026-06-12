@@ -1,4 +1,4 @@
-import { IsString, IsUrl, ValidateNested } from 'class-validator';
+import { IsOptional, IsString, IsUrl, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PushKeysDto {
@@ -16,4 +16,10 @@ export class SubscribeDto {
   @ValidateNested()
   @Type(() => PushKeysDto)
   keys: PushKeysDto;
+}
+
+export class SubscribeDenunciaDto extends SubscribeDto {
+  @IsString()
+  @IsOptional()
+  denunciaId?: string;
 }

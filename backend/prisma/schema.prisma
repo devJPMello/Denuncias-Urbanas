@@ -42,8 +42,8 @@ model Usuario {
   criadoEm     DateTime           @default(now()) @map("criado_em")
   atualizadoEm DateTime           @updatedAt      @map("atualizado_em")
 
-  denuncias         Denuncia[]
-  pushSubscriptions PushSubscription[]
+  denuncias              Denuncia[]
+  pushSubscriptions      PushSubscription[]
 
   @@map("usuarios")
 }
@@ -57,8 +57,20 @@ model PushSubscription {
   criadoEm DateTime @default(now()) @map("criado_em")
 
   usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  denuncias PushSubscriptionDenuncia[]
 
   @@map("push_subscriptions")
+}
+
+model PushSubscriptionDenuncia {
+  subscriptionId String @map("subscription_id")
+  denunciaId     String @map("denuncia_id")
+
+  subscription PushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  denuncia     Denuncia         @relation(fields: [denunciaId], references: [id], onDelete: Cascade)
+
+  @@id([subscriptionId, denunciaId])
+  @@map("push_subscription_denuncias")
 }
 
 model Denuncia {
@@ -77,6 +89,8 @@ model Denuncia {
   autor        Usuario?          @relation(fields: [autorId], references: [id])
   criadoEm    DateTime          @default(now()) @map("criado_em")
   atualizadoEm DateTime         @updatedAt      @map("atualizado_em")
+
+  pushSubscriptions PushSubscriptionDenuncia[]
 
   @@map("denuncias")
 }

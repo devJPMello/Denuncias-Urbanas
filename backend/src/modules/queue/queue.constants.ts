@@ -19,8 +19,9 @@ export interface MonitorComplaintsJob {
 }
 
 export interface SendPushJob {
-  usuarioId: string;
-  titulo:    string;
-  mensagem:  string;
-  url?:      string;
+  usuarioId?:  string;
+  denunciaId?: string;
+  titulo:      string;
+  mensagem:    string;
+  url?:        string;
 }

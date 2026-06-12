@@ -19,9 +19,14 @@ export class PushNotificationProcessor extends WorkerHost {
   async process(job: Job<SendPushJob>): Promise<void> {
     if (job.name !== JOB_SEND_PUSH) return;
 
-    const { usuarioId, titulo, mensagem, url } = job.data;
-    this.logger.debug(`Enviando push para ${usuarioId}: ${titulo}`);
+    const { usuarioId, denunciaId, titulo, mensagem, url } = job.data;
 
-    await this.pushService.sendToUser(usuarioId, { titulo, mensagem, url });
+    if (denunciaId) {
+      this.logger.debug(`Enviando push (anônimo) para denúncia ${denunciaId}: ${titulo}`);
+      await this.pushService.sendToDenuncia(denunciaId, { titulo, mensagem, url, denunciaId });
+    } else if (usuarioId) {
+      this.logger.debug(`Enviando push para ${usuarioId}: ${titulo}`);
+      await this.pushService.sendToUser(usuarioId, { titulo, mensagem, url });
+    }
   }
 }
